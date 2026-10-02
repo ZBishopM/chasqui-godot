@@ -62,9 +62,17 @@ godot.console.exe --headless --path . --script res://herramientas/generar_h4.gd
 - **H3:** cada clip del pack empieza y termina en su propia postura (mano abajo, pistola, guardia…), a 76–93° del `relax` que se usa de reposo; por eso volver era brusco. Los gestos nuevos salen del `relax` hacia el ápice del clip original y vuelven con curva suave, más una mezcla de 0,15 s al entrar y 0,4 s al salir (`MEZCLA_ENTRADA/SALIDA` en `manos.gd`).
 - **H4:** el rig no trae clips de gesto. `herramientas/ejes_mano.gd` calcula, de la geometría del rig, el eje con sentido de cada movimiento («el dedo se dobla hacia la palma», «el brazo sube»), así que las poses no dependen de cómo orientó sus huesos quien lo modeló.
 
-## Piel densa (para las venas)
+## Venas de oro bajo la piel
 
-`piel=` en el catálogo carga una versión densa de la malla de los brazos (`escenas/piel_h3.res`, `piel_h4.res`): el antebrazo, la muñeca y el dorso/palma tienen aristas de 4 mm como máximo, para que las venas puedan abultar la piel. La hornea `herramientas/hornear_piel.gd` con `codigo/malla_densa.gd` (solo parte las aristas largas de esa zona; el resto queda como estaba). Hay que volver a hornear si cambia el modelo:
+Las venas son bultos de la propia piel, no mallas encima: abultan el antebrazo y el dorso de la mano y el oro se trasluce por ellas.
+
+- **Piel densa:** `piel=` en el catálogo carga la malla de los brazos con el antebrazo, la muñeca y el dorso/palma partidos hasta aristas de 2,5 mm (`escenas/piel_h3.res`, `piel_h4.res`; `codigo/malla_densa.gd`). Así una vena tiene vértices de sobra a lo ancho.
+- **La red de venas** (`herramientas/campo_venas.gd`) se hornea en esos vértices: curvas irregulares en el antebrazo (las que vienen del dorso, dos gruesas por la cara interna y ramas en Y) y en el dorso de la mano (una entre cada par de nudillos y el arco que las cruza), con varices y puntas que se hunden. Cada vértice guarda su distancia a la vena más cercana.
+- **El shader** (`codigo/piel_venas.gd`, `PielVenas`) empuja la piel por la normal con un perfil de bulto, inclina la normal para que la luz dibuje el relieve y enciende el oro: núcleo dorado y halo rojizo, como luz que atraviesa la carne.
+- **Estados** (los mueve `Manos`): en reposo las venas tienen el tamaño `Manos.venas_base` (lo fija el juego: 0 sin poderes, 0,5 con poderes, sube hacia 1 con el Caos) y el oro solo late. Al usar un poder, un frente sube de los nudillos al codo con la curva de esfuerzo del gesto: por detrás las venas se hinchan al 100 % y el oro se enciende (`AnimProc.brillo_venas`, con su espasmo); luego vuelven a `venas_base`. El brazo sin poder acompaña al 30 %. `Manos.mana` (0–1) apaga el oro con el maná vacío.
+- **Se tocan en vivo** (parámetros del material): `altura` (m), `grosor` (1 = Caos bajo, ~1,5 = Caos alto), `luz`, `luz_reposo`, `latido`, `color_oro`.
+
+Volver a hornear si cambia el modelo o el trazado (`SEMILLA` en `hornear_piel.gd` da otra red igual de verosímil):
 
 ```
 godot.console.exe --headless --path . --script res://herramientas/hornear_piel.gd

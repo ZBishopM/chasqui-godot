@@ -19,6 +19,13 @@ var _gestos_anim: Dictionary = {}
 var _anim_reposo := ""
 var _dur_anim := 0.6
 var _clip_activo := ""
+# Venas de oro bajo la piel (PielVenas): al usar un poder se hinchan y encienden desde la mano hacia el codo con el esfuerzo
+# del gesto y luego vuelven a su tamaño de reposo; el brazo sin poder solo acompana.
+var venas_base := 0.5   # lo fija el juego: 0 sin poderes, 0.5 con poderes, sube hacia 1 con el Caos (el Monstruo)
+var mana := 1.0         # 0..1; lo fija el juego. Con el mana vacio el oro se apaga.
+var _piel: ShaderMaterial
+var _crec := 0.0
+var _crec_v := 0.0
 
 
 func montar(e: Dictionary) -> void:
@@ -29,6 +36,9 @@ func montar(e: Dictionary) -> void:
 	_sk = null
 	_gestos_anim = {}
 	_clip_activo = ""
+	_piel = null
+	_crec = 0.0
+	_crec_v = 0.0
 	_montar_skel(e)
 
 
@@ -38,16 +48,20 @@ func _montar_skel(e: Dictionary) -> void:
 	raiz.scale = Vector3.ONE * float(e.get("escala", 0.1))
 	raiz.rotation_degrees.y = float(e.get("yaw", 180.0))
 	add_child(raiz)
-	if e.has("piel"):
-		# Piel densa horneada (herramientas/hornear_piel.gd): la misma malla con vertices donde las venas pueden abultar.
-		for m: MeshInstance3D in raiz.find_children("*", "MeshInstance3D", true, false):
-			if m.skin != null:
-				m.set_meta("malla_original", m.mesh)
-				m.mesh = load(e.piel)
 	if e.has("textura"):
 		var piel := StandardMaterial3D.new()
 		piel.albedo_texture = load(e.textura)
 		_poner_material(raiz, piel)
+	if e.has("piel"):
+		# Piel densa horneada con la red de venas (herramientas/hornear_piel.gd) y su shader, con la textura que ya tenia.
+		for m: MeshInstance3D in raiz.find_children("*", "MeshInstance3D", true, false):
+			if m.skin != null:
+				var antes := (m.material_override if m.material_override != null else m.mesh.surface_get_material(0)) as StandardMaterial3D
+				var densa: Mesh = load(e.piel)
+				m.set_meta("malla_original", m.mesh)
+				m.mesh = densa
+				_piel = PielVenas.material(antes.albedo_texture, float(densa.get_meta("m_por_u", 1.0)))
+				m.material_override = _piel
 	# Escena editable (`Gestos` = AnimationPlayer con los clips del catalogo): se usa ella sola; el AnimationPlayer del
 	# modelo importado se apaga para que dos reproductores no se pisen los huesos.
 	_anim = raiz.get_node_or_null("Gestos") as AnimationPlayer
@@ -150,3 +164,15 @@ func _process(dt: float) -> void:
 		_sway_v[i] = s[1]
 	var resp := AnimProc.respiracion(_tiempo, 0.004)
 	position = Vector3(_sway.x + resp.x, _sway.y + resp.y, 0.0)
+
+	if _piel != null:
+		var p := progreso()
+		var meta := clampf(AnimProc.curva_esfuerzo(p), 0.0, 1.0) if p >= 0.0 else 0.0
+		var sv := AnimProc.resorte(_crec, _crec_v, meta, 0.12, dt)
+		_crec = maxf(sv[0], 0.0)
+		_crec_v = sv[1]
+		_piel.set_shader_parameter("venas_base", venas_base)
+		_piel.set_shader_parameter("crecimiento", _crec)
+		_piel.set_shader_parameter("crecimiento_otro", _crec * 0.3)
+		_piel.set_shader_parameter("brillo", AnimProc.brillo_venas(_tiempo, p, mana))
+		_piel.set_shader_parameter("brillo_otro", AnimProc.brillo_venas(_tiempo, -1.0, mana))
