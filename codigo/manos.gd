@@ -19,12 +19,6 @@ var _gestos_anim: Dictionary = {}
 var _anim_reposo := ""
 var _dur_anim := 0.6
 var _clip_activo := ""
-# Venas de oro (una por brazo; la 0 es la del poder, la mano izquierda).
-const CRECIMIENTO_REPOSO := 0.18
-var mana := 1.0   # 0..1; lo fija el juego. Con el mana vacio el oro se apaga.
-var _venas: Array[VenasOro] = []
-var _crec := CRECIMIENTO_REPOSO
-var _crec_v := 0.0
 
 
 func montar(e: Dictionary) -> void:
@@ -35,9 +29,6 @@ func montar(e: Dictionary) -> void:
 	_sk = null
 	_gestos_anim = {}
 	_clip_activo = ""
-	_venas.clear()
-	_crec = CRECIMIENTO_REPOSO
-	_crec_v = 0.0
 	_montar_skel(e)
 
 
@@ -47,6 +38,12 @@ func _montar_skel(e: Dictionary) -> void:
 	raiz.scale = Vector3.ONE * float(e.get("escala", 0.1))
 	raiz.rotation_degrees.y = float(e.get("yaw", 180.0))
 	add_child(raiz)
+	if e.has("piel"):
+		# Piel densa horneada (herramientas/hornear_piel.gd): la misma malla con vertices donde las venas pueden abultar.
+		for m: MeshInstance3D in raiz.find_children("*", "MeshInstance3D", true, false):
+			if m.skin != null:
+				m.set_meta("malla_original", m.mesh)
+				m.mesh = load(e.piel)
 	if e.has("textura"):
 		var piel := StandardMaterial3D.new()
 		piel.albedo_texture = load(e.textura)
@@ -78,33 +75,6 @@ func _montar_skel(e: Dictionary) -> void:
 		var medio := (_sk.get_bone_global_pose(_sk.find_bone(HUESOS.muneca)).origin + _sk.get_bone_global_pose(_sk.find_bone(HUESOS.muneca_der)).origin) * 0.5
 		var en_manos := global_transform.affine_inverse() * (_sk.global_transform * medio)
 		raiz.position += Vector3(0, -0.28, -0.42) - en_manos
-	_montar_venas(e)
-
-
-## `venas` en el catalogo: codo, muneca, dedos_base (nombres del brazo IZQUIERDO; el derecho sale cambiando .L por .R) y radios.
-func _montar_venas(e: Dictionary) -> void:
-	var cfg: Dictionary = e.get("venas", {})
-	if cfg.is_empty() or _sk == null:
-		return
-	for izq in [true, false]:
-		var v := VenasOro.new()
-		v.radio_brazo = float(cfg.get("radio_brazo", v.radio_brazo))
-		v.radio_mano = float(cfg.get("radio_mano", v.radio_mano))
-		v.grosor = float(cfg.get("grosor", v.grosor))
-		v.engrosa = float(cfg.get("engrosa", v.engrosa))
-		v.cantidad = int(cfg.get("cantidad", v.cantidad))
-		v.semilla = 7 if izq else 11
-		add_child(v)
-		var dedos: Array[String] = []
-		for n: String in cfg.dedos_base:
-			dedos.append(n if izq else n.replace(".L", ".R"))
-		var h := {
-			"codo": cfg.codo if izq else (cfg.codo as String).replace(".L", ".R"),
-			"muneca": cfg.muneca if izq else (cfg.muneca as String).replace(".L", ".R"),
-			"dedos_base": dedos,
-		}
-		v.construir(_sk, h, izq)
-		_venas.append(v)
 
 
 func _poner_material(n: Node, mat: Material) -> void:
@@ -180,18 +150,3 @@ func _process(dt: float) -> void:
 		_sway_v[i] = s[1]
 	var resp := AnimProc.respiracion(_tiempo, 0.004)
 	position = Vector3(_sway.x + resp.x, _sway.y + resp.y, 0.0)
-
-	if not _venas.is_empty():
-		# El oro crece desde la mano con el esfuerzo del gesto y se enciende con su dolor; en reposo respira.
-		var p := progreso()
-		var meta_crec := CRECIMIENTO_REPOSO
-		if p >= 0.0:
-			meta_crec += (1.0 - CRECIMIENTO_REPOSO) * clampf(AnimProc.curva_esfuerzo(p), 0.0, 1.0)
-		var sv := AnimProc.resorte(_crec, _crec_v, meta_crec, 0.12, dt)
-		_crec = sv[0]
-		_crec_v = sv[1]
-		_venas[0].crecimiento = _crec
-		_venas[0].brillo = AnimProc.brillo_venas(_tiempo, p, mana)
-		if _venas.size() > 1:   # el brazo sin poder solo acompana de lejos
-			_venas[1].crecimiento = CRECIMIENTO_REPOSO + (_crec - CRECIMIENTO_REPOSO) * 0.3
-			_venas[1].brillo = AnimProc.brillo_venas(_tiempo, -1.0, mana)

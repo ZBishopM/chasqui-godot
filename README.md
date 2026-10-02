@@ -62,11 +62,13 @@ godot.console.exe --headless --path . --script res://herramientas/generar_h4.gd
 - **H3:** cada clip del pack empieza y termina en su propia postura (mano abajo, pistola, guardia…), a 76–93° del `relax` que se usa de reposo; por eso volver era brusco. Los gestos nuevos salen del `relax` hacia el ápice del clip original y vuelven con curva suave, más una mezcla de 0,15 s al entrar y 0,4 s al salir (`MEZCLA_ENTRADA/SALIDA` en `manos.gd`).
 - **H4:** el rig no trae clips de gesto. `herramientas/ejes_mano.gd` calcula, de la geometría del rig, el eje con sentido de cada movimiento («el dedo se dobla hacia la palma», «el brazo sube»), así que las poses no dependen de cómo orientó sus huesos quien lo modeló.
 
-## Venas de oro
+## Piel densa (para las venas)
 
-`codigo/venas_oro.gd` (`VenasOro`): cintas finas pegadas a los huesos del dorso y la palma de la mano y del antebrazo, de ambos brazos. El shader las revela desde la mano (`crecimiento`, 0–1) y las enciende (`brillo`). En reposo respiran; con un gesto crecen y brillan con la curva de esfuerzo del propio gesto y parpadean con su espasmo (`AnimProc.brillo_venas`, port de la versión web); `Manos.mana` (0–1) las apaga con el maná vacío. El brazo del poder (el izquierdo) crece entero; el otro solo acompaña.
+`piel=` en el catálogo carga una versión densa de la malla de los brazos (`escenas/piel_h3.res`, `piel_h4.res`): el antebrazo, la muñeca y el dorso/palma tienen aristas de 4 mm como máximo, para que las venas puedan abultar la piel. La hornea `herramientas/hornear_piel.gd` con `codigo/malla_densa.gd` (solo parte las aristas largas de esa zona; el resto queda como estaba). Hay que volver a hornear si cambia el modelo:
 
-Se activan por entrada del catálogo con `venas=VENAS_H3` / `VENAS_H4` (nombres de huesos y calibración). Parámetros que se tocan: `grosor` (1 = fino y simétrico, Caos bajo; ~3 = grueso, Caos alto), `cantidad`, `radio_brazo` y `radio_mano` (metros: hasta dónde llega la piel desde el eje del hueso; si las venas no se ven, están dentro de la piel, y si flotan, el radio es de más) y `engrosa`.
+```
+godot.console.exe --headless --path . --script res://herramientas/hornear_piel.gd
+```
 
 ## Pruebas automáticas
 

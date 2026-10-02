@@ -3,19 +3,14 @@ extends RefCounted
 ## UNICA fuente de candidatos de la demo. Anadir un pack = anadir una entrada aqui (+ su adaptador si es de un tipo nuevo).
 ## `tipo` decide el adaptador: manos.gd (manos) · personajes.gd (personajes) · vfx_propios.gd / vfx_packs.gd (poderes).
 
-# Venas de oro (VenasOro): hueso del codo, de la muñeca y primera falange de cada dedo (brazo izquierdo; el derecho se deduce).
-# Los radios (m) son hasta donde llega la piel desde el eje del hueso: se calibran con una captura por rig.
-const VENAS_H4 := {codo="forearm.L", muneca="hand.L", dedos_base=["f_index.01.L", "f_middle.01.L", "f_ring.01.L", "f_pinky.01.L"], radio_brazo=0.056, radio_mano=0.016, engrosa=0.1, grosor=2.2}
-const VENAS_H3 := {codo="forearm.L", muneca="hand.L", dedos_base=["f_index.01.L", "f_middle.01.L", "f_ring.01.L", "f_pinky.01.L"], radio_brazo=0.045, radio_mano=0.019, engrosa=0.35, grosor=1.4}
-
 const MANOS := [
 	{id="H3", nombre="PSX First Person Arms (animadas)", licencia="CC0", autor="Drillimpact",
 		url="https://drillimpact.itch.io/psx-first-person-arms-free", rutas=["res://assets/manos/psx_arms/arms_rig.glb"],
-		escena="res://escenas/manos_h3.tscn", venas=VENAS_H3, escala=1.0, yaw=180.0, desplazo=Vector3(0, 0.12, -0.02), fov=70.0, tinta=false, anim_reposo="reposo",
+		escena="res://escenas/manos_h3.tscn", piel="res://escenas/piel_h3.res", escala=1.0, yaw=180.0, desplazo=Vector3(0, 0.12, -0.02), fov=70.0, tinta=false, anim_reposo="reposo",
 		gestos_anim={halcon="halcon", sapo="sapo", amaru="amaru", condor="condor", puma="puma", colibri="colibri"}},
 	{id="H4", nombre="OpenGameArt fps arms (rig con dedos)", licencia="CC0", autor="para",
 		url="https://opengameart.org/content/fps-arms-rigged-only", rutas=["res://assets/manos/oga_fps_arms/arms_anim.fbx"],
-		textura="res://assets/manos/oga_fps_arms/new_diff.png", escena="res://escenas/manos_h4.tscn", venas=VENAS_H4, escala=0.1, yaw=180.0, tinta=false,
+		textura="res://assets/manos/oga_fps_arms/new_diff.png", escena="res://escenas/manos_h4.tscn", piel="res://escenas/piel_h4.res", escala=0.1, yaw=180.0, tinta=false,
 		anim_reposo="reposo", gestos_anim={halcon="halcon", sapo="sapo", amaru="amaru", condor="condor", puma="puma", colibri="colibri"}},
 ]
 

@@ -318,6 +318,46 @@ func capturar_picos() -> String:
 	return "\n".join(rutas)
 
 
+## Primer plano del antebrazo izquierdo (el del poder) y su mano, desde fuera del cuerpo, con una camara aparte y sin HUD.
+## `giro` (grados) rota la camara alrededor del brazo hacia arriba (90 = desde encima); `alambre` dibuja la malla en
+## alambre. Se usa desde el MCP.
+func capturar_brazo(nombre: String, giro := 0.0, alambre := false, distancia := 0.34) -> String:
+	var sk: Skeleton3D = manos._sk
+	var codo := sk.global_transform * sk.get_bone_global_pose(sk.find_bone("forearm.L")).origin
+	var muneca := sk.global_transform * sk.get_bone_global_pose(sk.find_bone("hand.L")).origin
+	var centro := codo.lerp(muneca, 0.7)
+	var eje := (muneca - codo).normalized()
+	var arriba: Vector3 = jugador.camara.global_transform.basis.y
+	# De lado y por fuera: perpendicular al brazo y a "arriba", con el signo que aleja del ojo del jugador.
+	var lado := eje.cross(arriba).normalized()
+	var fuera: Vector3 = centro - jugador.camara.global_position
+	if lado.dot(fuera) < 0.0:
+		lado = -lado
+	var dir := lado.rotated(eje, deg_to_rad(giro) * (1.0 if eje.cross(lado).dot(arriba) > 0.0 else -1.0))
+	var cam := Camera3D.new()
+	cam.fov = 45.0
+	cam.near = 0.01
+	add_child(cam)
+	cam.global_position = centro + dir * distancia
+	cam.look_at(centro, arriba)
+	cam.make_current()
+	_hud.visible = false
+	if alambre:
+		# El alambre solo existe para mallas creadas con esta opcion activa: se recrean las de las manos.
+		RenderingServer.set_debug_generate_wireframes(true)
+		for m: MeshInstance3D in manos.find_children("*", "MeshInstance3D", true, false):
+			m.mesh = m.mesh.duplicate()
+		get_viewport().debug_draw = Viewport.DEBUG_DRAW_WIREFRAME
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	var ruta := _captura(nombre)
+	get_viewport().debug_draw = Viewport.DEBUG_DRAW_DISABLED
+	_hud.visible = true
+	jugador.camara.make_current()
+	cam.queue_free()
+	return ruta
+
+
 ## Mide cuanto se mueve el hueso mas rapido de las manos durante cada gesto (entrada, pico y vuelta al reposo), en grados/s.
 ## Un salto de 90 grados en un solo frame da >10000; un gesto fluido queda por debajo de unos 700. Se usa desde el MCP.
 func medir_suavidad() -> String:
