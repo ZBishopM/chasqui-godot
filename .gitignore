@@ -1,0 +1,7 @@
+.godot/
+_descargas/
+*.import.bak
+capturas/
+# Lo inyecta el MCP de Godot al ejecutar el proyecto; no es parte del juego
+mcp_interaction_server.gd
+mcp_interaction_server.gd.uid
