@@ -16,6 +16,10 @@ static func crear(e: Dictionary) -> Node3D:
 			n = _kaykit(e)
 		"kenney":
 			n = _kenney(e)
+		"ubc":
+			n = _ubc(e)
+		"ual":
+			n = _ual(e)
 		_:
 			n = _procedural()
 	n.set_meta("entrada", e)
@@ -38,6 +42,38 @@ static func _kaykit(e: Dictionary) -> Node3D:
 		src.free()
 	ap.add_animation_library("", lib)
 	ap.play("Idle_A")
+	n.set_meta("anim", ap)
+	return n
+
+
+const UAL := "res://assets/personajes/ual/UAL1_Standard.glb"
+
+
+## Personaje Quaternius (sin animaciones propias): toma las 43 de la Universal Animation Library, que comparte esqueleto.
+static func _ubc(e: Dictionary) -> Node3D:
+	var n: Node3D = (load(e.rutas[0]) as PackedScene).instantiate()
+	var ap := AnimationPlayer.new()
+	n.add_child(ap)
+	ap.root_node = NodePath("..")
+	var src: Node = (load(UAL) as PackedScene).instantiate()
+	var sap := src.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	var lib := AnimationLibrary.new()
+	for nombre in sap.get_animation_list():
+		var a := sap.get_animation(nombre).duplicate() as Animation
+		a.loop_mode = Animation.LOOP_LINEAR if nombre in ["Idle", "Walk", "Jog_Fwd", "Sprint", "Idle_Talking", "Idle_Torch"] else Animation.LOOP_NONE
+		lib.add_animation(nombre, a)
+	src.free()
+	ap.add_animation_library("", lib)
+	ap.play("Idle")
+	n.set_meta("anim", ap)
+	return n
+
+
+static func _ual(e: Dictionary) -> Node3D:
+	var n: Node3D = (load(e.rutas[0]) as PackedScene).instantiate()
+	var ap := n.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	ap.get_animation("Idle").loop_mode = Animation.LOOP_LINEAR
+	ap.play("Idle")
 	n.set_meta("anim", ap)
 	return n
 

@@ -9,6 +9,14 @@ const MANOS := [
 	{id="H4", nombre="OpenGameArt fps arms (rig con dedos)", tipo="skel_brazos", licencia="CC0", autor="para",
 		url="https://opengameart.org/content/fps-arms-rigged-only", rutas=["res://assets/manos/oga_fps_arms/arms_anim.fbx"],
 		textura="res://assets/manos/oga_fps_arms/new_diff.png", escala=0.1, yaw=180.0, tinta=false},
+	{id="H3", nombre="PSX First Person Arms (animadas)", tipo="skel_brazos", licencia="CC0", autor="Drillimpact",
+		url="https://drillimpact.itch.io/psx-first-person-arms-free", rutas=["res://assets/manos/psx_arms/arms_rig.glb"],
+		escala=1.0, yaw=180.0, desplazo=Vector3(0, 0.12, -0.02), fov=70.0, tinta=false, anim_reposo="relax",
+		gestos_anim={halcon="grab_L", sapo="push_L", amaru="finger_gun_fire", condor="guard_draw", puma="jab_L", colibri="finger_gun_idle"}},
+	{id="H3g", nombre="PSX First Person Arms con guantes", tipo="skel_brazos", licencia="CC0", autor="Drillimpact",
+		url="https://drillimpact.itch.io/psx-first-person-arms-free", rutas=["res://assets/manos/psx_arms/arms_rig.glb"],
+		textura="res://assets/manos/psx_arms/arms_gloves_01.png", pixelado=true, escala=1.0, yaw=180.0, desplazo=Vector3(0, 0.12, -0.02), fov=70.0, tinta=false, anim_reposo="relax",
+		gestos_anim={halcon="grab_L", sapo="push_L", amaru="finger_gun_fire", condor="guard_draw", puma="jab_L", colibri="finger_gun_idle"}},
 ]
 
 const PERSONAJES := [
@@ -23,10 +31,20 @@ const PERSONAJES := [
 		url="https://kenney.nl/assets/blocky-characters", rutas=["res://assets/personajes/kenney/character-a.glb"]},
 	{id="P4b", nombre="Kenney Blocky K", tipo="kenney", licencia="CC0", autor="Kenney",
 		url="https://kenney.nl/assets/blocky-characters", rutas=["res://assets/personajes/kenney/character-k.glb"]},
+	{id="P3a", nombre="Quaternius Superhero (hombre)", tipo="ubc", licencia="CC0", autor="Quaternius",
+		url="https://quaternius.itch.io/universal-base-characters", rutas=["res://assets/personajes/ubc/Superhero_Male_FullBody.gltf"]},
+	{id="P3b", nombre="Quaternius Superhero (mujer)", tipo="ubc", licencia="CC0", autor="Quaternius",
+		url="https://quaternius.itch.io/universal-base-characters", rutas=["res://assets/personajes/ubc/Superhero_Female_FullBody.gltf"]},
+	{id="P3m", nombre="Quaternius Maniqui (UAL)", tipo="ual", licencia="CC0", autor="Quaternius",
+		url="https://quaternius.itch.io/universal-animation-library", rutas=["res://assets/personajes/ual/UAL1_Standard.glb"]},
 ]
 
 const VFX := [
 	{id="V1", nombre="Propio (particulas + shaders)", tipo="propio", licencia="propia", autor="Chasqui", url=""},
+	{id="V2", nombre="Binbun Magic Projectiles (12 proyectiles)", tipo="binbun_proyectiles", licencia="CC0", autor="Binbun",
+		url="https://binbun3d.itch.io/magic-projectiles-vfx"},
+	{id="V3", nombre="Binbun Elemental Magic FX (gratis: fuego)", tipo="binbun_elemental", licencia="CC0", autor="Binbun",
+		url="https://binbun3d.itch.io/elemental-magic-fx"},
 ]
 
 const ESTILOS := [

@@ -19,6 +19,7 @@ La primera vez, el editor importa los assets (unos segundos).
 | WASD · Espacio · mouse | moverse, saltar, mirar |
 | `1` manos · `2` personaje · `3` VFX · `4` estilo | siguiente candidato (con **Mayús**: el anterior) |
 | `F` Halcón · `G` Sapo · `R` Amaru · `T` Cóndor · `V` Puma · `C` Colibrí | poderes (Mayús+`C`: ralentiza en vez de detener) |
+| `O` | ofrenda: efecto de recogida (Loot VFX de Binbun) en el suelo, de común a mítico |
 | `Tab` | vitrina: todos los personajes en fila |
 | `K` | guarda `combinacion.json` + una captura en `capturas/` |
 | `F1` · `Esc` | oculta el HUD · libera el mouse |
@@ -33,6 +34,8 @@ El HUD muestra, por cada categoría, el candidato actual con su licencia y autor
 4. Si es un `tipo` nuevo: adaptador en `codigo/manos.gd`, `codigo/personajes.gd` o un `vfx_*.gd`.
 
 Descargas a mano (itch.io y Sketchfab piden clic o cuenta): dejarlas en `_descargas/` (Godot no la importa, ni git la sube).
+Tipos de adaptador que ya existen: manos `propia` y `skel_brazos` (esqueleto + gestos por huesos o por clips); personajes `procedural`, `kaykit`, `kenney`, `ubc` y `ual`; VFX `propio`, `binbun_proyectiles` y `binbun_elemental`.
+Los VFX de packs solo ponen el visual: la mecánica de cada poder (empuje del Halcón, hundimiento del Sapo, tiempo del Colibrí, siluetas del Puma) sale de `VfxPropios.mecanica()`.
 
 ## Pruebas automáticas
 

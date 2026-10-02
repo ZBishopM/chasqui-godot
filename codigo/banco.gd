@@ -29,6 +29,7 @@ var sel := {"manos": 0, "personajes": 0, "vfx": 0, "estilo": 0}
 var _dummies: Array[Node3D] = []
 var _vitrina: Node3D
 var _en_vitrina := false
+var _rareza := 0
 var _hud: Label
 var _mat_pantalla: ShaderMaterial
 
@@ -66,6 +67,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 		_alternar_vitrina()
 	elif k.keycode == KEY_K:
 		_guardar()
+	elif k.keycode == KEY_O:
+		_ofrenda()
 	elif k.keycode == KEY_F1:
 		_hud.visible = not _hud.visible
 
@@ -97,6 +100,7 @@ func _aplicar(cat: String) -> void:
 	match cat:
 		"manos":
 			manos.montar(_actual("manos"))
+			jugador.camara.fov = float(_actual("manos").get("fov", 90.0))   # cada rig se ve bien con su FOV
 			Estilo.aplicar(manos, _actual("estilo").id == "toon", _actual("manos").get("tinta", true))
 		"personajes":
 			_montar_dummies()
@@ -132,7 +136,7 @@ func _montar_vitrina() -> void:
 	var lista := Catalogo.PERSONAJES
 	for i in lista.size():
 		var c := Personajes.crear(lista[i])
-		c.position = Vector3((i - (lista.size() - 1) / 2.0) * 1.5, 0, -2)
+		c.position = Vector3((i - (lista.size() - 1) / 2.0) * 1.3, 0, -2)
 		_vitrina.add_child(c)
 		var et := Label3D.new()
 		et.text = "%s\n%s" % [lista[i].id, lista[i].nombre]
@@ -158,9 +162,18 @@ func _alternar_vitrina() -> void:
 func _poder(poder: String) -> void:
 	manos.lanzar_gesto(poder)
 	await get_tree().create_timer(manos.duracion() * 0.5).timeout   # el efecto sale en el pico del gesto
-	match _actual("vfx").tipo:
+	var tipo: String = _actual("vfx").tipo
+	match tipo:
 		"propio":
 			VfxPropios.lanzar(poder, _ctx())
+		"binbun_proyectiles", "binbun_elemental":
+			VfxPacks.lanzar(tipo, poder, _ctx())
+
+
+## Efecto de recogida de las ofrendas (Loot VFX de Binbun), de comun a mitico. Es el visual del Camaquen de oro sagrado.
+func _ofrenda() -> void:
+	VfxPacks.ofrenda(_ctx(), _rareza)
+	_rareza = (_rareza + 1) % VfxPacks.RAREZAS.size()
 
 
 func _ctx() -> Dictionary:
@@ -243,7 +256,7 @@ func _actualizar_hud() -> void:
 		lineas.append("[%d] %-10s %s %s%s" % [i + 1, cat.capitalize(), e.get("id", ""), e.nombre, lic])
 	lineas.append("")
 	lineas.append("F Halcon · G Sapo · R Amaru · T Condor · V Puma · C Colibri (Mayus+C ralentiza)")
-	lineas.append("Mayus+1..4 anterior · Tab vitrina · K guardar · F1 ocultar · Esc mouse")
+	lineas.append("O ofrenda (Loot VFX, rareza cicla) · Mayus+1..4 anterior · Tab vitrina · K guardar · F1 ocultar · Esc mouse")
 	_hud.text = "\n".join(lineas)
 
 

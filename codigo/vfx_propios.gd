@@ -21,6 +21,19 @@ static var _sprite: GradientTexture2D
 static var _xray: Shader
 
 
+## Solo la mecanica (sin visual propio): la usan los packs, que ponen su propio visual encima.
+static func mecanica(poder: String, ctx: Dictionary) -> void:
+	match poder:
+		"halcon": _halcon_mecanica(ctx)
+		"sapo": _sapo_mecanica(ctx)
+		"amaru":
+			ctx.mundo.create_tween().tween_interval(0.45).finished.connect(func() -> void: _reaccion(ctx.mundo, ctx.dummies, ctx.destino))
+		"condor":
+			ctx.mundo.create_tween().tween_interval(0.2).finished.connect(func() -> void: _reaccion(ctx.mundo, ctx.dummies, ctx.destino))
+		"puma": _puma(ctx)
+		"colibri": _colibri(ctx)
+
+
 static func lanzar(poder: String, ctx: Dictionary) -> void:
 	match poder:
 		"halcon": _halcon(ctx)
@@ -33,11 +46,21 @@ static func lanzar(poder: String, ctx: Dictionary) -> void:
 
 # --- Halcon: despegue + picado, estela de viento y patada de FOV -------------------------------
 
-static func _halcon(ctx: Dictionary) -> void:
+## Lo que cambia el juego: despegue vertical, picado hacia delante y patada de FOV. Lo comparten VFX propios y packs.
+static func _halcon_mecanica(ctx: Dictionary) -> void:
 	var jug: CharacterBody3D = ctx.jugador
 	var fwd: Vector3 = ctx.fwd
 	jug.velocity.y = 6.0                                   # fase 1: despegue vertical
 	jug.impulso = Vector3(fwd.x, 0, fwd.z).normalized() * 18.0   # fase 2: picado hacia delante
+	var fov_base: float = ctx.camara.fov
+	var tw: Tween = ctx.mundo.create_tween()
+	tw.tween_property(ctx.camara, "fov", fov_base + 16.0, 0.12)
+	tw.tween_property(ctx.camara, "fov", fov_base, 0.5).set_trans(Tween.TRANS_SINE)
+
+
+static func _halcon(ctx: Dictionary) -> void:
+	var fwd: Vector3 = ctx.fwd
+	_halcon_mecanica(ctx)
 	# Lineas de velocidad: palitos finos alineados con -fwd que nacen en un anillo delante de la camara.
 	var pm := _proc(-fwd, 0.0, 22.0, 30.0, Vector3.ZERO, Color(0.9, 0.97, 1.0, 0.9), Color(0.9, 0.97, 1.0, 0.0), 0.7, 1.4, 0.0)
 	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
@@ -54,9 +77,6 @@ static func _halcon(ctx: Dictionary) -> void:
 	mp.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	palito.material = mp
 	_particulas(ctx.mundo, ctx.camara.global_position + fwd * 4.0, 90, 0.4, pm, palito, true, 0.7)
-	var tw: Tween = ctx.mundo.create_tween()
-	tw.tween_property(ctx.camara, "fov", 106.0, 0.12)
-	tw.tween_property(ctx.camara, "fov", 90.0, 0.5).set_trans(Tween.TRANS_SINE)
 
 
 # --- Sapo: golpe de suelo, micro-huayco, enemigos atrapados hasta las rodillas ------------------
@@ -71,8 +91,13 @@ static func _sapo(ctx: Dictionary) -> void:
 	var tw: Tween = ctx.mundo.create_tween()
 	tw.tween_interval(3.0)
 	tw.tween_callback(charco.queue_free)
+	_sapo_mecanica(ctx)
+
+
+## Lo que cambia el juego: quienes estan cerca del golpe quedan atrapados hasta las rodillas unos segundos.
+static func _sapo_mecanica(ctx: Dictionary) -> void:
 	for d: Node3D in ctx.dummies:
-		if d.global_position.distance_to(suelo) < 4.0:
+		if d.global_position.distance_to(ctx.suelo) < 4.0:
 			var base := d.position.y
 			var t2: Tween = ctx.mundo.create_tween()
 			t2.tween_property(d, "position:y", base - 0.45, 0.2)
@@ -215,7 +240,7 @@ static func _tiempo(ctx: Dictionary, escala: float) -> void:
 		if ap != null:
 			ap.speed_scale = escala
 	for p in ctx.mundo.get_tree().get_nodes_in_group("vfx"):
-		if p is GPUParticles3D:
+		if p is GPUParticles3D or "speed_scale" in p:   # los efectos de Binbun tambien traen speed_scale
 			p.speed_scale = escala
 
 

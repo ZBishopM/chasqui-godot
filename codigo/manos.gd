@@ -33,6 +33,10 @@ var _huesos_izq: Array[int] = []
 var _dedos_huesos: Array = []
 var _reposo_hueso: Dictionary = {}
 var _tiene_skel_gesto := false
+# Tipo skel_brazos con animaciones propias (H3): cada poder reproduce un clip y luego vuelve al reposo.
+var _gestos_anim: Dictionary = {}
+var _anim_reposo := ""
+var _dur_anim := 0.6
 
 
 func _ready() -> void:
@@ -53,6 +57,7 @@ func montar(e: Dictionary) -> void:
 	_dedos_huesos = []
 	_reposo_hueso.clear()
 	_tiene_skel_gesto = false
+	_gestos_anim = {}
 	_progreso = -1.0
 	match e.tipo:
 		"propia":
@@ -108,18 +113,31 @@ func _montar_skel(e: Dictionary) -> void:
 	if e.has("textura"):
 		var piel := StandardMaterial3D.new()
 		piel.albedo_texture = load(e.textura)
+		if e.get("pixelado", false):
+			piel.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 		_poner_material(raiz, piel)
 	_anim = _buscar(raiz, "AnimationPlayer") as AnimationPlayer
+	_gestos_anim = e.get("gestos_anim", {})
 	if _anim != null and _anim.get_animation_list().size() > 0:
-		_anim.play(_anim.get_animation_list()[0])
+		var reposo: String = e.get("anim_reposo", "")
+		_anim_reposo = reposo if reposo != "" and _anim.has_animation(reposo) else _anim.get_animation_list()[0]
+		_anim.get_animation(_anim_reposo).loop_mode = Animation.LOOP_LINEAR
+		_anim.play(_anim_reposo)
 		_anim.advance(0.0)
-		_anim.active = false   # el reposo queda fijo; los gestos escriben sobre los huesos
+		if _gestos_anim.is_empty():
+			_anim.active = false   # el reposo queda fijo; los gestos escriben sobre los huesos
 	_sk = _buscar(raiz, "Skeleton3D") as Skeleton3D
 	var izq := _sk.find_bone("hand.L")
 	var der := _sk.find_bone("hand.R")
-	var medio := (_sk.get_bone_global_pose(izq).origin + _sk.get_bone_global_pose(der).origin) * 0.5
-	var en_manos := global_transform.affine_inverse() * (_sk.global_transform * medio)
-	raiz.position += Vector3(0, -0.28, -0.42) - en_manos
+	var cam_i := _sk.find_bone("camera")
+	if cam_i >= 0:
+		# El rig trae un hueso "camera": el ojo del jugador va ahi (mas el desplazo del catalogo).
+		var ojo := global_transform.affine_inverse() * (_sk.global_transform * _sk.get_bone_global_pose(cam_i).origin)
+		raiz.position += (e.get("desplazo", Vector3.ZERO) as Vector3) - ojo
+	else:
+		var medio := (_sk.get_bone_global_pose(izq).origin + _sk.get_bone_global_pose(der).origin) * 0.5
+		var en_manos := global_transform.affine_inverse() * (_sk.global_transform * medio)
+		raiz.position += Vector3(0, -0.28, -0.42) - en_manos
 	# Hueso izquierdo y sus dedos: el reposo se guarda para sumar deltas cada frame.
 	_huesos_izq = [_sk.find_bone("upper_arm.L"), _sk.find_bone("hand.L")]
 	for dedo in ["f_index", "f_middle", "f_ring", "f_pinky", "thumb"]:
@@ -131,7 +149,7 @@ func _montar_skel(e: Dictionary) -> void:
 		_dedos_huesos.append(cadena)
 	for i in _sk.get_bone_count():
 		_reposo_hueso[i] = _sk.get_bone_pose_rotation(i)
-	_tiene_skel_gesto = true
+	_tiene_skel_gesto = _gestos_anim.is_empty()
 
 
 func _poner_material(n: Node, mat: Material) -> void:
@@ -156,6 +174,16 @@ func _guardar_reposo(n: Node3D) -> void:
 
 
 func lanzar_gesto(poder: String) -> void:
+	if not _gestos_anim.is_empty():
+		var clip: String = _gestos_anim.get(poder, "")
+		if clip != "" and _anim.has_animation(clip):
+			var a := _anim.get_animation(clip)
+			a.loop_mode = Animation.LOOP_NONE
+			_dur_anim = a.length
+			_anim.play(clip)
+			if not _anim.animation_finished.is_connected(_volver_al_reposo):
+				_anim.animation_finished.connect(_volver_al_reposo)
+		return
 	if _pivote_izq == null and not _tiene_skel_gesto:
 		return
 	_variante = AnimProc.variante_al_azar(poder, _rng)
@@ -171,8 +199,15 @@ func progreso() -> float:
 	return _progreso
 
 
+func _volver_al_reposo(clip: StringName) -> void:
+	if clip != _anim_reposo:
+		_anim.play(_anim_reposo)
+
+
 ## Duracion (s) del gesto que acaba de lanzarse; 0.4 si estas manos no tienen gesto.
 func duracion() -> float:
+	if not _gestos_anim.is_empty():
+		return _dur_anim
 	return float(_variante.duracion) if (_pivote_izq != null or _tiene_skel_gesto) and not _variante.is_empty() else 0.4
 
 
