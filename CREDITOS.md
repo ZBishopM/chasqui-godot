@@ -5,9 +5,7 @@ Al añadir un pack: copiar aquí autor, licencia y URL (confirmando la licencia 
 
 | Id | Qué | Autor | Licencia | Fuente | Ruta |
 |---|---|---|---|---|---|
-| H1 | Manos propias (metaballs, Blender → glTF) | Chasqui | propia | `chasqui-code/public/models` | `assets/manos/propia/` |
-| H2 | WRAD ARMS (clara y oscura; rig IK sin animaciones, pose fijada en el catálogo) | wriks | CC0 (`LICENSE.txt`) | https://wriks.itch.io/wrad-arms | `assets/manos/wrad_arms/` |
-| H3 | PSX First Person Arms (rig, 18 animaciones; con y sin guantes) | Drillimpact | CC0 | https://drillimpact.itch.io/psx-first-person-arms-free | `assets/manos/psx_arms/` |
+| H3 | PSX First Person Arms (rig, 18 animaciones) | Drillimpact | CC0 | https://drillimpact.itch.io/psx-first-person-arms-free | `assets/manos/psx_arms/` |
 | H4 | FPS arms (rigged only) | para | CC0 | https://opengameart.org/content/fps-arms-rigged-only | `assets/manos/oga_fps_arms/` |
 | P2 | KayKit Adventurers 2.0 (personajes + animaciones `Rig_Medium`) | Kay Lousberg | CC0 | https://kaylousberg.itch.io/kaykit-adventurers | `assets/personajes/kaykit/` |
 | P3 | Universal Base Characters (Standard: Superhero hombre y mujer) | Quaternius | CC0 (`License.txt`) | https://quaternius.itch.io/universal-base-characters | `assets/personajes/ubc/` |
@@ -23,5 +21,4 @@ Notas:
 - Los packs de Binbun conservan su estructura (`res://assets/BinbunVFX...`): sus escenas llevan esas rutas escritas.
   A las escenas de Elemental Magic FX se les quitaron los UID obsoletos de los `ext_resource` (Godot los resolvía por ruta con un aviso por carga).
 - Las texturas del pack Quaternius pesan ~25 MB; si el repo molesta, se pueden bajar de resolución sin tocar el modelo.
-
-WRAD pide atribución (opcional, CC0): «WRAD ARMS» de wriks, https://wriks.motorcycles. `WRAD_TEXTURES.zip` es otro pack del mismo autor (texturas fotográficas, 732 MB) y no se importó.
+- Descartadas tras probarlas en la demo (siguen en el historial de git): manos propias de la versión web (H1, en `chasqui-code/public/models`), WRAD ARMS (H2) y la textura con guantes del pack PSX (H3g).

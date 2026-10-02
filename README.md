@@ -40,10 +40,10 @@ El HUD muestra, por cada categoría, el candidato actual con su licencia y autor
 1. Copiar los archivos a `assets/<categoría>/<pack>/` (con su `License.txt`).
 2. Añadir una entrada en `codigo/catalogo.gd` (`tipo` decide el adaptador).
 3. Anotar autor, licencia y URL en `CREDITOS.md`.
-4. Si es un `tipo` nuevo: adaptador en `codigo/manos.gd`, `codigo/personajes.gd` o un `vfx_*.gd`.
+4. Si es un `tipo` nuevo: adaptador en `codigo/personajes.gd` o un `vfx_*.gd`.
 
 Descargas a mano (itch.io y Sketchfab piden clic o cuenta): dejarlas en `_descargas/` (Godot no la importa, ni git la sube).
-Tipos de adaptador que ya existen: manos `propia` y `skel_brazos` (esqueleto + gestos por huesos o por clips); personajes `procedural`, `kaykit`, `kenney`, `ubc` y `ual`; VFX `propio`, `binbun_proyectiles` y `binbun_elemental`.
+Manos: brazos con `Skeleton3D` y una escena con el `AnimationPlayer` `Gestos` (ver abajo). Tipos de adaptador que ya existen: personajes `procedural`, `kaykit`, `kenney`, `ubc` y `ual`; VFX `propio`, `binbun_proyectiles` y `binbun_elemental`.
 Los VFX de packs solo ponen el visual: la mecánica de cada poder (empuje del Halcón, hundimiento del Sapo, tiempo del Colibrí, siluetas del Puma) sale de `VfxPropios.mecanica()`.
 
 ## Gestos de las manos (H3 y H4): editables en el editor de Godot
