@@ -12,6 +12,12 @@ const YAW := 16.0
 const ANCLA_BRAZO := Vector3(0, -0.12, 0.2)
 const FALANGES := ["Indice", "Medio", "Anular", "Menique", "Pulgar"]
 const PESO_FALANGE := [1.0, 0.8, 0.5]
+## Nombres de huesos del tipo skel_brazos (convencion de Blender "Rigify" de H3 y H4); una entrada del catalogo los pisa con `huesos`.
+## En `dedos`, %d es la falange (1 a 3).
+const HUESOS_DEFECTO := {
+	brazo = "upper_arm.L", muneca = "hand.L", muneca_der = "hand.R", ojo = "camera",
+	dedos = ["f_index.0%d.L", "f_middle.0%d.L", "f_ring.0%d.L", "f_pinky.0%d.L", "thumb.0%d.L"],
+}
 
 signal gesto_terminado
 
@@ -127,23 +133,30 @@ func _montar_skel(e: Dictionary) -> void:
 		if _gestos_anim.is_empty():
 			_anim.active = false   # el reposo queda fijo; los gestos escriben sobre los huesos
 	_sk = _buscar(raiz, "Skeleton3D") as Skeleton3D
-	var izq := _sk.find_bone("hand.L")
-	var der := _sk.find_bone("hand.R")
-	var cam_i := _sk.find_bone("camera")
+	var hs: Dictionary = HUESOS_DEFECTO.merged(e.get("huesos", {}), true)   # cada rig nombra distinto sus huesos
+	# `pose`: grados sobre el eje X local de cada hueso, para rigs sin animacion (WRAD viene con brazos colgando).
+	var pose: Dictionary = e.get("pose", {})
+	for hueso: String in pose:
+		var h := _sk.find_bone(hueso)
+		if h >= 0:
+			_sk.set_bone_pose_rotation(h, _sk.get_bone_pose_rotation(h) * Quaternion(Vector3.RIGHT, deg_to_rad(float(pose[hueso]))))
+	var izq := _sk.find_bone(hs.muneca)
+	var der := _sk.find_bone(hs.muneca_der)
+	var cam_i := _sk.find_bone(hs.ojo)
 	if cam_i >= 0:
-		# El rig trae un hueso "camera": el ojo del jugador va ahi (mas el desplazo del catalogo).
+		# El rig trae un hueso de camara/cabeza: el ojo del jugador va ahi (mas el desplazo del catalogo).
 		var ojo := global_transform.affine_inverse() * (_sk.global_transform * _sk.get_bone_global_pose(cam_i).origin)
 		raiz.position += (e.get("desplazo", Vector3.ZERO) as Vector3) - ojo
 	else:
 		var medio := (_sk.get_bone_global_pose(izq).origin + _sk.get_bone_global_pose(der).origin) * 0.5
 		var en_manos := global_transform.affine_inverse() * (_sk.global_transform * medio)
-		raiz.position += Vector3(0, -0.28, -0.42) - en_manos
+		raiz.position += (e.get("manos_en", Vector3(0, -0.28, -0.42)) as Vector3) - en_manos
 	# Hueso izquierdo y sus dedos: el reposo se guarda para sumar deltas cada frame.
-	_huesos_izq = [_sk.find_bone("upper_arm.L"), _sk.find_bone("hand.L")]
-	for dedo in ["f_index", "f_middle", "f_ring", "f_pinky", "thumb"]:
+	_huesos_izq = [_sk.find_bone(hs.brazo), _sk.find_bone(hs.muneca)]
+	for patron: String in hs.dedos:
 		var cadena: Array[int] = []
-		for n in ["01", "02", "03"]:
-			var i := _sk.find_bone("%s.%s.L" % [dedo, n])
+		for n in [1, 2, 3]:
+			var i := _sk.find_bone(patron % n)
 			if i >= 0:
 				cadena.append(i)
 		_dedos_huesos.append(cadena)

@@ -3,12 +3,26 @@ extends RefCounted
 ## UNICA fuente de candidatos de la demo. Anadir un pack = anadir una entrada aqui (+ su adaptador si es de un tipo nuevo).
 ## `tipo` decide el adaptador: manos.gd (manos) · personajes.gd (personajes) · vfx_propios.gd / vfx_packs.gd (poderes).
 
+const WRAD_HUESOS := {
+	brazo = "bicep.l", muneca = "wrist.l", muneca_der = "wrist.r", ojo = "",
+	dedos = ["finger_index%d.l", "finger_middle%d.l", "finger_ring%d.l", "finger_pinky%d.l", "finger_thumb%d.l"],
+}
+
+# WRAD viene con los brazos colgando. Pose de primera persona hallada por busqueda numerica (codigo en la sesion): brazo -60 y codo -90 grados sobre el eje X local de cada hueso (simetrica).
+const WRAD_POSE := {"bicep.l": -60.0, "bicep.r": -60.0, "forearm.l": -90.0, "forearm.r": -90.0}
+
 const MANOS := [
 	{id="H1", nombre="Propia (metaballs)", tipo="propia", licencia="propia", autor="Chasqui",
 		url="", rutas=["res://assets/manos/propia/mano-izq.glb", "res://assets/manos/propia/mano-der.glb"]},
 	{id="H4", nombre="OpenGameArt fps arms (rig con dedos)", tipo="skel_brazos", licencia="CC0", autor="para",
 		url="https://opengameart.org/content/fps-arms-rigged-only", rutas=["res://assets/manos/oga_fps_arms/arms_anim.fbx"],
 		textura="res://assets/manos/oga_fps_arms/new_diff.png", escala=0.1, yaw=180.0, tinta=false},
+	{id="H2", nombre="WRAD ARMS (clara)", tipo="skel_brazos", licencia="CC0", autor="wriks",
+		url="https://wriks.itch.io/wrad-arms", rutas=["res://assets/manos/wrad_arms/arms.glb"],
+		escala=0.06, yaw=180.0, tinta=false, huesos=WRAD_HUESOS, pose=WRAD_POSE, manos_en=Vector3(0, -0.12, -0.2)},
+	{id="H2d", nombre="WRAD ARMS (oscura)", tipo="skel_brazos", licencia="CC0", autor="wriks",
+		url="https://wriks.itch.io/wrad-arms", rutas=["res://assets/manos/wrad_arms/arms.glb"],
+		textura="res://assets/manos/wrad_arms/arm_albedo_dark.png", escala=0.06, yaw=180.0, tinta=false, huesos=WRAD_HUESOS, pose=WRAD_POSE, manos_en=Vector3(0, -0.12, -0.2)},
 	{id="H3", nombre="PSX First Person Arms (animadas)", tipo="skel_brazos", licencia="CC0", autor="Drillimpact",
 		url="https://drillimpact.itch.io/psx-first-person-arms-free", rutas=["res://assets/manos/psx_arms/arms_rig.glb"],
 		escala=1.0, yaw=180.0, desplazo=Vector3(0, 0.12, -0.02), fov=70.0, tinta=false, anim_reposo="relax",

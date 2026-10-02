@@ -12,6 +12,15 @@ godot -e --path D:\2026-projects\chasqui\chasqui-godot       # abre el editor (F
 
 La primera vez, el editor importa los assets (unos segundos).
 
+### Trabajar con el editor abierto
+
+El editor y la demo que lanza Claude (por el MCP de Godot) **conviven**: son dos procesos. Con el editor abierto, Claude edita los archivos del disco y Godot los recarga al volver a la ventana. La ventana «Chasqui (DEBUG)» que abre Claude es un juego real: se puede jugar con el mouse y el teclado a la vez que él la maneja.
+
+- F5 en el editor lanza **tu** juego; Claude no puede manejar esa ventana (solo la que lanza él).
+- Cuando Claude cambia un `.gd` o el catálogo, relanza su ventana; la tuya hay que reiniciarla (F5 otra vez).
+- Si Godot pregunta «archivos modificados en disco», elige «Recargar».
+- Ejecutar el proyecto desde Claude añade temporalmente un autoload (`mcp_interaction_server.gd`) a `project.godot`; se quita al detener el juego.
+
 ## Controles
 
 | Tecla | Hace |

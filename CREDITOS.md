@@ -6,6 +6,7 @@ Al añadir un pack: copiar aquí autor, licencia y URL (confirmando la licencia 
 | Id | Qué | Autor | Licencia | Fuente | Ruta |
 |---|---|---|---|---|---|
 | H1 | Manos propias (metaballs, Blender → glTF) | Chasqui | propia | `chasqui-code/public/models` | `assets/manos/propia/` |
+| H2 | WRAD ARMS (clara y oscura; rig IK sin animaciones, pose fijada en el catálogo) | wriks | CC0 (`LICENSE.txt`) | https://wriks.itch.io/wrad-arms | `assets/manos/wrad_arms/` |
 | H3 | PSX First Person Arms (rig, 18 animaciones; con y sin guantes) | Drillimpact | CC0 | https://drillimpact.itch.io/psx-first-person-arms-free | `assets/manos/psx_arms/` |
 | H4 | FPS arms (rigged only) | para | CC0 | https://opengameart.org/content/fps-arms-rigged-only | `assets/manos/oga_fps_arms/` |
 | P2 | KayKit Adventurers 2.0 (personajes + animaciones `Rig_Medium`) | Kay Lousberg | CC0 | https://kaylousberg.itch.io/kaykit-adventurers | `assets/personajes/kaykit/` |
@@ -23,4 +24,4 @@ Notas:
   A las escenas de Elemental Magic FX se les quitaron los UID obsoletos de los `ext_resource` (Godot los resolvía por ruta con un aviso por carga).
 - Las texturas del pack Quaternius pesan ~25 MB; si el repo molesta, se pueden bajar de resolución sin tocar el modelo.
 
-Pendiente de descargar: **WRAD ARMS** (https://wriks.itch.io/wrad-arms). El archivo `WRAD_TEXTURES.zip` que apareció en las descargas es otro pack del mismo autor (texturas fotográficas, 732 MB) y no se importó.
+WRAD pide atribución (opcional, CC0): «WRAD ARMS» de wriks, https://wriks.motorcycles. `WRAD_TEXTURES.zip` es otro pack del mismo autor (texturas fotográficas, 732 MB) y no se importó.
