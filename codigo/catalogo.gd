@@ -25,12 +25,12 @@ const MANOS := [
 		textura="res://assets/manos/wrad_arms/arm_albedo_dark.png", escala=0.06, yaw=180.0, tinta=false, huesos=WRAD_HUESOS, pose=WRAD_POSE, manos_en=Vector3(0, -0.12, -0.2)},
 	{id="H3", nombre="PSX First Person Arms (animadas)", tipo="skel_brazos", licencia="CC0", autor="Drillimpact",
 		url="https://drillimpact.itch.io/psx-first-person-arms-free", rutas=["res://assets/manos/psx_arms/arms_rig.glb"],
-		escala=1.0, yaw=180.0, desplazo=Vector3(0, 0.12, -0.02), fov=70.0, tinta=false, anim_reposo="relax",
-		gestos_anim={halcon="grab_L", sapo="push_L", amaru="finger_gun_fire", condor="guard_draw", puma="jab_L", colibri="finger_gun_idle"}},
+		escena="res://escenas/manos_h3.tscn", escala=1.0, yaw=180.0, desplazo=Vector3(0, 0.12, -0.02), fov=70.0, tinta=false, anim_reposo="reposo",
+		gestos_anim={halcon="halcon", sapo="sapo", amaru="amaru", condor="condor", puma="puma", colibri="colibri"}},
 	{id="H3g", nombre="PSX First Person Arms con guantes", tipo="skel_brazos", licencia="CC0", autor="Drillimpact",
 		url="https://drillimpact.itch.io/psx-first-person-arms-free", rutas=["res://assets/manos/psx_arms/arms_rig.glb"],
-		textura="res://assets/manos/psx_arms/arms_gloves_01.png", pixelado=true, escala=1.0, yaw=180.0, desplazo=Vector3(0, 0.12, -0.02), fov=70.0, tinta=false, anim_reposo="relax",
-		gestos_anim={halcon="grab_L", sapo="push_L", amaru="finger_gun_fire", condor="guard_draw", puma="jab_L", colibri="finger_gun_idle"}},
+		textura="res://assets/manos/psx_arms/arms_gloves_01.png", pixelado=true, escena="res://escenas/manos_h3.tscn", escala=1.0, yaw=180.0, desplazo=Vector3(0, 0.12, -0.02), fov=70.0, tinta=false, anim_reposo="reposo",
+		gestos_anim={halcon="halcon", sapo="sapo", amaru="amaru", condor="condor", puma="puma", colibri="colibri"}},
 ]
 
 const PERSONAJES := [

@@ -17,8 +17,27 @@ void fragment() {
 }
 """
 
+const ANCHO_ANILLO := 0.16   # m, constante sin importar el radio
+const SHADER_ANILLO := """
+shader_type spatial;
+render_mode unshaded, blend_add, cull_disabled, depth_draw_never;
+uniform vec4 color : source_color = vec4(1.0);
+uniform float radio = 0.2;
+uniform float ancho = 0.12;
+uniform float alfa = 1.0;
+varying vec3 pos_local;
+void vertex() { pos_local = VERTEX; }
+void fragment() {
+	float d = abs(length(pos_local.xz) - radio);
+	float a = 1.0 - smoothstep(ancho * 0.25, ancho * 0.5, d);
+	ALBEDO = color.rgb * 2.0;
+	ALPHA = a * alfa;
+}
+"""
+
 static var _sprite: GradientTexture2D
 static var _xray: Shader
+static var _sh_anillo: Shader
 
 
 ## Solo la mecanica (sin visual propio): la usan los packs, que ponen su propio visual encima.
@@ -335,24 +354,31 @@ static func _luz(padre: Node, color: Color, energia: float, rango: float) -> Omn
 	return l
 
 
-static func _anillo(mundo: Node, pos: Vector3, color: Color, radio_final: float, seg: float) -> void:
+## Anillo de ANCHO FIJO que se expande por el suelo. Un toro escalado engordaba con el radio (1,3 m de grosor a 16 m);
+## aqui el plano no se escala: el shader dibuja la franja a `ancho` metros de la distancia `radio`.
+static func _anillo(mundo: Node, pos: Vector3, color: Color, radio_final: float, seg: float, ancho: float = ANCHO_ANILLO) -> void:
+	if _sh_anillo == null:
+		_sh_anillo = Shader.new()
+		_sh_anillo.code = SHADER_ANILLO
 	var m := MeshInstance3D.new()
-	var t := TorusMesh.new()
-	t.inner_radius = 0.92
-	t.outer_radius = 1.0
-	m.mesh = t
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	mat.albedo_color = color
+	var plano := PlaneMesh.new()
+	plano.size = Vector2.ONE * (radio_final * 2.0 + ancho * 2.0)
+	m.mesh = plano
+	var mat := ShaderMaterial.new()
+	mat.shader = _sh_anillo
+	mat.set_shader_parameter("color", color)
+	mat.set_shader_parameter("ancho", ancho)
+	mat.set_shader_parameter("radio", 0.2)
+	mat.set_shader_parameter("alfa", 1.0)
 	m.material_override = mat
-	m.scale = Vector3(0.2, 0.2, 0.2)
+	m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mundo.add_child(m)
+	m.add_to_group("vfx")
 	m.global_position = pos
 	var tw: Tween = mundo.create_tween().set_parallel(true)
-	tw.tween_property(m, "scale", Vector3(radio_final, radio_final, radio_final), seg).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(mat, "albedo_color:a", 0.0, seg)
+	tw.tween_method(func(v: float) -> void: mat.set_shader_parameter("radio", v), 0.2, radio_final, seg)\
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_method(func(v: float) -> void: mat.set_shader_parameter("alfa", v), 1.0, 0.0, seg)
 	tw.chain().tween_callback(m.queue_free)
 
 

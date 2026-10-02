@@ -288,6 +288,40 @@ const PRUEBAS := {
 }
 
 
+## Mide cuanto se mueve el hueso mas rapido de las manos durante cada gesto (entrada, pico y vuelta al reposo), en grados/s.
+## Un salto de 90 grados en un solo frame da >10000; un gesto fluido queda por debajo de unos 700. Se usa desde el MCP.
+func medir_suavidad() -> String:
+	var sk: Skeleton3D = manos._sk
+	if sk == null:
+		return "estas manos no usan Skeleton3D"
+	var huesos := GestosLib.huesos_utiles(sk)
+	var out: PackedStringArray = ["manos=" + str(_actual("manos").id)]
+	for poder in PRUEBAS:
+		await get_tree().create_timer(0.8).timeout
+		var previa := GestosLib.pose_actual(sk, huesos)
+		var t_prev := Time.get_ticks_usec()
+		manos.lanzar_gesto(poder)
+		var vmax := 0.0
+		var t_en := 0.0
+		var t0 := Time.get_ticks_msec()
+		while Time.get_ticks_msec() - t0 < int((manos.duracion() + 1.0) * 1000.0):
+			await get_tree().process_frame
+			var ahora := Time.get_ticks_usec()
+			var dt := (ahora - t_prev) / 1e6
+			t_prev = ahora
+			var p := GestosLib.pose_actual(sk, huesos)
+			var d := 0.0
+			for i in huesos:
+				d = maxf(d, (previa[i] as Quaternion).angle_to(p[i]))
+			var v := rad_to_deg(d) / maxf(dt, 0.0001)
+			if v > vmax:
+				vmax = v
+				t_en = (Time.get_ticks_msec() - t0) / 1000.0
+			previa = p
+		out.append("%s: dur=%.2f s  vel_max=%.0f °/s (t=%.2f s)" % [poder, manos.duracion(), vmax, t_en])
+	return "\n".join(out)
+
+
 ## Recorre los 6 poderes con la combinacion actual y deja las capturas en capturas/ (para revisar sin jugar).
 func probar_todo() -> void:
 	for poder: String in PRUEBAS:

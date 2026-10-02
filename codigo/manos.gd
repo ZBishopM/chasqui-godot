@@ -12,6 +12,8 @@ const YAW := 16.0
 const ANCLA_BRAZO := Vector3(0, -0.12, 0.2)
 const FALANGES := ["Indice", "Medio", "Anular", "Menique", "Pulgar"]
 const PESO_FALANGE := [1.0, 0.8, 0.5]
+const MEZCLA_ENTRADA := 0.15   # s: del reposo al gesto
+const MEZCLA_SALIDA := 0.4     # s: del gesto al reposo (mas lenta: es lo que se notaba brusco)
 ## Nombres de huesos del tipo skel_brazos (convencion de Blender "Rigify" de H3 y H4); una entrada del catalogo los pisa con `huesos`.
 ## En `dedos`, %d es la falange (1 a 3).
 const HUESOS_DEFECTO := {
@@ -43,6 +45,7 @@ var _tiene_skel_gesto := false
 var _gestos_anim: Dictionary = {}
 var _anim_reposo := ""
 var _dur_anim := 0.6
+var _clip_activo := ""
 
 
 func _ready() -> void:
@@ -64,6 +67,7 @@ func montar(e: Dictionary) -> void:
 	_reposo_hueso.clear()
 	_tiene_skel_gesto = false
 	_gestos_anim = {}
+	_clip_activo = ""
 	_progreso = -1.0
 	match e.tipo:
 		"propia":
@@ -112,7 +116,7 @@ func _montar_propia(e: Dictionary) -> void:
 ## Brazos con Skeleton3D de un solo mesh (H4). Se escala, se gira para mirar a -Z y se coloca por el punto medio de las manos.
 ## La animacion de muestra se congela en su primer cuadro: ese es el reposo sobre el que se suman los gestos (hueso izquierdo).
 func _montar_skel(e: Dictionary) -> void:
-	var raiz: Node3D = (load(e.rutas[0]) as PackedScene).instantiate()
+	var raiz: Node3D = (load(e.get("escena", e.rutas[0])) as PackedScene).instantiate()
 	raiz.scale = Vector3.ONE * float(e.get("escala", 0.1))
 	raiz.rotation_degrees.y = float(e.get("yaw", 180.0))
 	add_child(raiz)
@@ -122,12 +126,21 @@ func _montar_skel(e: Dictionary) -> void:
 		if e.get("pixelado", false):
 			piel.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 		_poner_material(raiz, piel)
-	_anim = _buscar(raiz, "AnimationPlayer") as AnimationPlayer
+	# Escena editable (`Gestos` = AnimationPlayer con los clips del catalogo): se usa ella sola; el AnimationPlayer del
+	# modelo importado se apaga para que dos reproductores no se pisen los huesos.
+	_anim = raiz.get_node_or_null("Gestos") as AnimationPlayer
+	if _anim != null:
+		for otro in _buscar_todos(raiz, "AnimationPlayer"):
+			if otro != _anim:
+				(otro as AnimationPlayer).active = false
+	else:
+		_anim = _buscar(raiz, "AnimationPlayer") as AnimationPlayer
 	_gestos_anim = e.get("gestos_anim", {})
 	if _anim != null and _anim.get_animation_list().size() > 0:
 		var reposo: String = e.get("anim_reposo", "")
 		_anim_reposo = reposo if reposo != "" and _anim.has_animation(reposo) else _anim.get_animation_list()[0]
 		_anim.get_animation(_anim_reposo).loop_mode = Animation.LOOP_LINEAR
+		_anim.playback_default_blend_time = MEZCLA_ENTRADA
 		_anim.play(_anim_reposo)
 		_anim.advance(0.0)
 		if _gestos_anim.is_empty():
@@ -182,6 +195,15 @@ func _buscar(n: Node, clase: String) -> Node:
 	return null
 
 
+func _buscar_todos(n: Node, clase: String) -> Array[Node]:
+	var r: Array[Node] = []
+	if n.is_class(clase):
+		r.append(n)
+	for c in n.get_children():
+		r.append_array(_buscar_todos(c, clase))
+	return r
+
+
 func _guardar_reposo(n: Node3D) -> void:
 	_reposo[n] = n.transform
 
@@ -193,7 +215,8 @@ func lanzar_gesto(poder: String) -> void:
 			var a := _anim.get_animation(clip)
 			a.loop_mode = Animation.LOOP_NONE
 			_dur_anim = a.length
-			_anim.play(clip)
+			_clip_activo = clip
+			_anim.play(clip, MEZCLA_ENTRADA)
 			if not _anim.animation_finished.is_connected(_volver_al_reposo):
 				_anim.animation_finished.connect(_volver_al_reposo)
 		return
@@ -207,14 +230,17 @@ func hay_gesto() -> bool:
 	return _progreso >= 0.0
 
 
-## 0..1 del gesto en curso (para sincronizar luz/VFX con el dolor de la mano).
+## 0..1 del gesto en curso (para sincronizar luz/VFX con el dolor de la mano); -1 si no hay gesto.
 func progreso() -> float:
+	if _clip_activo != "" and _anim != null and _anim.current_animation == _clip_activo:
+		return clampf(_anim.current_animation_position / maxf(_anim.current_animation_length, 0.001), 0.0, 1.0)
 	return _progreso
 
 
 func _volver_al_reposo(clip: StringName) -> void:
 	if clip != _anim_reposo:
-		_anim.play(_anim_reposo)
+		_clip_activo = ""
+		_anim.play(_anim_reposo, MEZCLA_SALIDA)
 
 
 ## Duracion (s) del gesto que acaba de lanzarse; 0.4 si estas manos no tienen gesto.
