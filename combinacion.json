@@ -1,0 +1,19 @@
+{
+	"estilo": {
+		"id": "pbr",
+		"nombre": "PBR (luz normal)"
+	},
+	"fecha": "2026-10-02T13:23:02",
+	"manos": {
+		"id": "H3",
+		"nombre": "PSX First Person Arms (animadas)"
+	},
+	"personajes": {
+		"id": "P3a",
+		"nombre": "Quaternius Superhero (hombre)"
+	},
+	"vfx": {
+		"id": "V1",
+		"nombre": "Propio (particulas + shaders)"
+	}
+}
