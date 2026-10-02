@@ -4,7 +4,7 @@ extends RefCounted
 ## La forma temporal es la `curva_esfuerzo` de la version web (anticipacion, pico tardio, aguante, rebote), y cada hueso
 ## se interpola por cuaternion: pose(p) = reposo * (reposo^-1 * pico)^w(p), con w fuera de [0,1] en la anticipacion y el rebote.
 
-const MUESTRAS := 28
+const MUESTRAS := 48
 
 
 ## Huesos que deforman la malla (se dejan fuera los de control IK, la camara y las puntas).
@@ -77,7 +77,10 @@ static func peso(p: float, forma: String) -> float:
 
 ## Animation de `dur` segundos: reposo -> pico -> reposo con la forma elegida. Las rutas de pista son relativas a `raiz`
 ## (la raiz del modelo, que es donde apunta root_node del AnimationPlayer).
-static func clip_pose_a_pose(raiz: Node, sk: Skeleton3D, huesos: Array[int], reposo: Dictionary, pico: Dictionary, dur: float, forma: String = "suave") -> Animation:
+## `temblor`: hueso -> eje local; si `temblor_grados` > 0, esos huesos tiemblan con el `espasmo` de la version web
+## (0 en reposo, maximo en el esfuerzo) sumado a la pose; `semilla` desfasa el patron para que cada poder tiemble distinto.
+static func clip_pose_a_pose(raiz: Node, sk: Skeleton3D, huesos: Array[int], reposo: Dictionary, pico: Dictionary, dur: float,
+		forma: String = "suave", temblor: Dictionary = {}, temblor_grados: float = 0.0, semilla: float = 0.0) -> Animation:
 	var a := Animation.new()
 	a.length = dur
 	var base := str(raiz.get_path_to(sk))
@@ -100,7 +103,23 @@ static func clip_pose_a_pose(raiz: Node, sk: Skeleton3D, huesos: Array[int], rep
 			if s > 0.0001:   # si no, el hueso no se mueve y el eje no esta definido
 				var eje := Vector3(delta.x, delta.y, delta.z) / s
 				q = q0 * Quaternion(eje, 2.0 * acos(clampf(delta.w, -1.0, 1.0)) * w)
+			if temblor_grados > 0.0 and temblor.has(i) and k < MUESTRAS:
+				q = q * Quaternion(temblor[i], deg_to_rad(temblor_grados * AnimProc.espasmo(p, semilla)))
 			a.rotation_track_insert_key(pistas[i], p * dur, q)
+	return a
+
+
+## Clip de una sola pose que se repite (el reposo de un rig sin animacion de reposo propia).
+static func clip_estatico(raiz: Node, sk: Skeleton3D, huesos: Array[int], pose: Dictionary, dur: float = 2.0) -> Animation:
+	var a := Animation.new()
+	a.length = dur
+	a.loop_mode = Animation.LOOP_LINEAR
+	var base := str(raiz.get_path_to(sk))
+	for hueso in huesos:
+		var pista := a.add_track(Animation.TYPE_ROTATION_3D)
+		a.track_set_path(pista, NodePath("%s:%s" % [base, sk.get_bone_name(hueso)]))
+		a.rotation_track_insert_key(pista, 0.0, pose[hueso])
+		a.rotation_track_insert_key(pista, dur, pose[hueso])
 	return a
 
 

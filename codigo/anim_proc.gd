@@ -67,6 +67,19 @@ static func respiracion(t: float, amplitud: float = 1.0) -> Vector2:
 	return Vector2(x, y)
 
 
+## Multiplicador de brillo de las venas de oro (port de brilloVenas en VenasOro.ts). Reposo: respira alrededor de 1.
+## `canalizando` = progreso 0..1 del gesto (o -1 si no hay): el brillo SUBE con la misma curva de esfuerzo que la mano y
+## parpadea con su espasmo, es decir, la luz sufre el mismo dolor. Con el mana vacio el oro se apaga a ~45 %.
+static func brillo_venas(t: float, canalizando: float, mana: float) -> float:
+	var b := 1.0 + sin(t * 1.3) * 0.12 + sin(t * 0.7 + 2.1) * 0.06
+	if canalizando >= 0.0:
+		var c := clampf(canalizando, 0.0, 1.0)
+		var surge := maxf(0.0, curva_esfuerzo(c))
+		b += surge * 1.6 + espasmo(c, 0.5) * 0.35 * surge
+	var atenuacion := 0.45 + 0.55 * clampf(mana, 0.0, 1.0)
+	return maxf(0.15, b * atenuacion)
+
+
 static func _negexp_rapido(x: float) -> float:
 	return 1.0 / (1.0 + x + 0.48 * x * x + 0.235 * x * x * x)
 

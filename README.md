@@ -46,8 +46,34 @@ Descargas a mano (itch.io y Sketchfab piden clic o cuenta): dejarlas en `_descar
 Tipos de adaptador que ya existen: manos `propia` y `skel_brazos` (esqueleto + gestos por huesos o por clips); personajes `procedural`, `kaykit`, `kenney`, `ubc` y `ual`; VFX `propio`, `binbun_proyectiles` y `binbun_elemental`.
 Los VFX de packs solo ponen el visual: la mecánica de cada poder (empuje del Halcón, hundimiento del Sapo, tiempo del Colibrí, siluetas del Puma) sale de `VfxPropios.mecanica()`.
 
+## Gestos de las manos (H3 y H4): editables en el editor de Godot
+
+Los gestos de los seis poderes son **clips `Animation` normales** guardados en una escena: `escenas/manos_h3.tscn` (PSX) y `escenas/manos_h4.tscn` (OpenGameArt). Cada una tiene un `AnimationPlayer` llamado `Gestos` con el clip `reposo`, uno por poder (`halcon`, `sapo`, `amaru`, `condor`, `puma`, `colibri`) y, en la librería `originales`, los clips que traía el pack.
+
+Para retocar un gesto: abre la escena → selecciona `Gestos` → elige el clip en el panel de animación → mueve el hueso en el Inspector (`Skeleton3D` › Bones) y pulsa la llave para insertar la clave. La demo carga la escena tal cual; no hace falta regenerar nada.
+
+Si prefieres cambiar *números* en vez de claves: edita `PICOS` (grados por movimiento) en `herramientas/generar_h4.gd`, o `GESTOS` (de qué clip se toma la pose) en `generar_h3.gd`, y vuelve a ejecutar. **Ojo: regenerar pisa las claves que hayas tocado a mano en esos clips.**
+
+```
+godot.console.exe --headless --path . --script res://herramientas/generar_h3.gd
+godot.console.exe --headless --path . --script res://herramientas/generar_h4.gd
+```
+
+- **H3:** cada clip del pack empieza y termina en su propia postura (mano abajo, pistola, guardia…), a 76–93° del `relax` que se usa de reposo; por eso volver era brusco. Los gestos nuevos salen del `relax` hacia el ápice del clip original y vuelven con curva suave, más una mezcla de 0,15 s al entrar y 0,4 s al salir (`MEZCLA_ENTRADA/SALIDA` en `manos.gd`).
+- **H4:** el rig no trae clips de gesto. `herramientas/ejes_mano.gd` calcula, de la geometría del rig, el eje con sentido de cada movimiento («el dedo se dobla hacia la palma», «el brazo sube»), así que las poses no dependen de cómo orientó sus huesos quien lo modeló.
+
+## Venas de oro
+
+`codigo/venas_oro.gd` (`VenasOro`): cintas finas pegadas a los huesos del dorso y la palma de la mano y del antebrazo, de ambos brazos. El shader las revela desde la mano (`crecimiento`, 0–1) y las enciende (`brillo`). En reposo respiran; con un gesto crecen y brillan con la curva de esfuerzo del propio gesto y parpadean con su espasmo (`AnimProc.brillo_venas`, port de la versión web); `Manos.mana` (0–1) las apaga con el maná vacío. El brazo del poder (el izquierdo) crece entero; el otro solo acompaña.
+
+Se activan por entrada del catálogo con `venas=VENAS_H3` / `VENAS_H4` (nombres de huesos y calibración). Parámetros que se tocan: `grosor` (1 = fino y simétrico, Caos bajo; ~3 = grueso, Caos alto), `cantidad`, `radio_brazo` y `radio_mano` (metros: hasta dónde llega la piel desde el eje del hueso; si las venas no se ven, están dentro de la piel, y si flotan, el radio es de más) y `engrosa`.
+
 ## Pruebas automáticas
 
-`codigo/banco.gd` expone `probar(poder, instantes)` y `probar_todo()`: lanzan los poderes y guardan capturas en `capturas/`. Se usan desde el MCP de Godot (`game_eval`).
+`codigo/banco.gd` expone, para el MCP de Godot (`game_eval`):
+
+- `probar(poder, instantes)` y `probar_todo()`: lanzan los poderes y guardan capturas en `capturas/`.
+- `capturar_picos()`: congela cada gesto de las manos en su pico y guarda `manos_<id>_<poder>.png`.
+- `medir_suavidad()`: velocidad angular máxima del hueso más rápido durante cada gesto (°/s). Un salto de 90° en un frame da más de 10 000; un gesto fluido queda bajo ~700. Estado actual: H3 260–510 °/s, H4 410–730 °/s.
 
 Humo sin ventana: `godot.console.exe --headless --path . --quit-after 120` (**N son frames**, ~60/s; nunca `godot.exe`, traga la salida).

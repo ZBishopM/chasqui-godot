@@ -288,6 +288,36 @@ const PRUEBAS := {
 }
 
 
+## Congela cada gesto de las manos en su pico (y el reposo) y guarda una captura de cada uno: manos_<id>_<poder>.png.
+## Para revisar a ojo la pose de un clip sin esperar su animacion. Se usa desde el MCP.
+func capturar_picos() -> String:
+	var ap: AnimationPlayer = manos._anim
+	if ap == null or manos._gestos_anim.is_empty():
+		return "estas manos no tienen clips de gesto"
+	var id: String = _actual("manos").id
+	ap.active = true
+	ap.playback_default_blend_time = 0.0
+	var rutas: PackedStringArray = []
+	var lista := ["reposo"]
+	lista.append_array(PRUEBAS.keys())
+	for poder: String in lista:
+		var clip: String = manos._anim_reposo if poder == "reposo" else manos._gestos_anim.get(poder, "")
+		if clip == "":
+			continue
+		manos._clip_activo = "" if poder == "reposo" else clip   # asi las venas ven el progreso congelado
+		ap.play(clip)
+		ap.seek(0.0 if poder == "reposo" else ap.get_animation(clip).length * 0.52, true)
+		ap.speed_scale = 0.0   # congela el clip sin vaciar current_animation (pause() la vacia y las venas pierden el progreso)
+		await get_tree().create_timer(0.7).timeout   # deja que el crecimiento de las venas (un resorte) alcance su meta
+		await RenderingServer.frame_post_draw
+		rutas.append(_captura("manos_%s_%s" % [id, poder]))
+	ap.speed_scale = 1.0
+	manos._clip_activo = ""
+	ap.playback_default_blend_time = Manos.MEZCLA_ENTRADA
+	ap.play(manos._anim_reposo)
+	return "\n".join(rutas)
+
+
 ## Mide cuanto se mueve el hueso mas rapido de las manos durante cada gesto (entrada, pico y vuelta al reposo), en grados/s.
 ## Un salto de 90 grados en un solo frame da >10000; un gesto fluido queda por debajo de unos 700. Se usa desde el MCP.
 func medir_suavidad() -> String:
