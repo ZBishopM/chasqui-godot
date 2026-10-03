@@ -11,7 +11,8 @@ extends RefCounted
 ##     y el oro se enciende con `brillo` (la curva de esfuerzo y el espasmo del gesto); despues vuelven a `venas_base`.
 ##
 ## Se tocan en vivo: altura (m), grosor (1 = Caos bajo; ~1,5 = Caos alto), luz, luz_reposo, latido, color_oro (el oro
-## sucio de la vena), color_pepita, pepitas y pepitas_escala (las pepitas de oro en bruto).
+## sucio de la vena), color_pepita, pepitas y pepitas_escala (las pepitas de oro en bruto), infeccion, coagulos y
+## color_coagulo (la vena negra y los coagulos rojos).
 
 const SHADER := """
 shader_type spatial;
@@ -32,6 +33,11 @@ uniform vec3 color_oro : source_color = vec3(0.62, 0.40, 0.11);
 uniform vec3 color_pepita : source_color = vec3(1.0, 0.80, 0.38);
 uniform float pepitas = 1.0;           // cuanto brillan las pepitas (0 = sin pepitas)
 uniform float pepitas_escala = 260.0;  // pepitas por unidad de UV (mas = mas pequenas)
+// Infeccion dentro del oro, como lava viva: costras negras con el borde al rojo que flotan sobre el oro encendido y
+// coagulos rojos que se forman y se deshacen. Con el oro en reposo no se ven.
+uniform float infeccion = 1.0;         // 0 = oro limpio
+uniform vec3 color_coagulo : source_color = vec3(0.62, 0.05, 0.03);
+uniform float coagulos = 1.0;          // 0 = sin coagulos
 uniform float luz = 1.15;              // energia del oro encendido
 uniform float luz_reposo = 0.08;       // fraccion de luz que conserva el oro en reposo
 uniform float latido = 0.12;           // cuanto late la vena (altura) con el pulso
@@ -66,6 +72,16 @@ float ruido(vec2 p) {
 	vec2 f = fract(p);
 	f = f * f * (3.0 - 2.0 * f);
 	return mix(mix(azar(i), azar(i + vec2(1.0, 0.0)), f.x), mix(azar(i + vec2(0.0, 1.0)), azar(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+
+// Tres octavas giradas entre si: las manchas salen organicas y no cuadradas (el ruido de valor solo deja ver su rejilla).
+float manchas(vec2 p) {
+	mat2 giro = mat2(vec2(0.8, -0.6), vec2(0.6, 0.8));
+	float s = ruido(p) * 0.55;
+	p = giro * p * 2.1 + 7.3;
+	s += ruido(p) * 0.3;
+	p = giro * p * 2.3 + 3.1;
+	return s + ruido(p) * 0.15;
 }
 
 // Pulso doble del corazon (lub-dub), 0..1.
@@ -122,10 +138,26 @@ void fragment() {
 	float n = ruido(UV * pepitas_escala) * 0.7 + ruido(UV * pepitas_escala * 2.3 + 17.0) * 0.3;
 	float pepita = smoothstep(0.66, 0.86, n) * smoothstep(0.25, 0.7, nucleo) * pepitas;
 	pepita *= 0.85 + 0.15 * sin(TIME * 2.3 + n * 40.0);
-	vec3 oro = color_oro * nucleo * nucleo + color_oro * vec3(1.0, 0.45, 0.25) * halo * 0.18 + color_pepita * pepita * 1.6;
-	ALBEDO = mix(ALBEDO, ALBEDO * vec3(1.05, 0.92, 0.7), pepita * 0.6 * v_tam);   // la pepita tine la piel aun apagada
 	float flujo = 0.75 + 0.25 * sin(v_g * 70.0 - TIME * 10.0);   // pulsos de oro que corren hacia el codo
 	float encendido = luz_reposo * (1.0 + 0.6 * pulso(TIME)) * v_tam + 0.6 * v_encendido * flujo + v_frente;
+	float vivo = smoothstep(0.08, 0.6, encendido);   // 0 con el oro en reposo, 1 con el oro encendido
+	// Infeccion, dentro del oro como lava viva: costras negras que flotan sobre el oro (derivan y se deforman despacio) con
+	// el borde al rojo, y coagulos rojos que se forman y se deshacen. Solo existe donde arde el oro: en reposo no se ve.
+	vec2 deriva = vec2(TIME * 0.11, -TIME * 0.06);
+	float ni = manchas(UV * pepitas_escala * 0.3 + 91.0 + deriva + 0.6 * vec2(sin(TIME * 0.4), cos(TIME * 0.3)));
+	float en_vena = smoothstep(0.1, 0.5, nucleo);
+	float negro = smoothstep(0.55, 0.64, ni) * en_vena * infeccion;
+	float borde = (smoothstep(0.49, 0.55, ni) - smoothstep(0.55, 0.62, ni)) * en_vena * infeccion;
+	float nc = manchas(UV * pepitas_escala * 0.4 + 251.0 - deriva * 0.7);
+	float vive = smoothstep(0.2, 0.8, 0.5 + 0.5 * sin(TIME * 0.35 + nc * 25.0));
+	float coagulo = smoothstep(0.56, 0.66, nc) * en_vena * vive * coagulos * (1.0 - negro);
+	pepita *= 1.0 - negro;
+	vec3 oro = (color_oro * nucleo * nucleo + color_oro * vec3(1.0, 0.45, 0.25) * halo * 0.18) * (1.0 - negro * 0.95)
+			+ color_pepita * (pepita * 1.6 + borde * 0.9) + color_coagulo * coagulo * 1.4;
+	ALBEDO = mix(ALBEDO, ALBEDO * vec3(1.05, 0.92, 0.7), pepita * 0.6 * v_tam);   // la pepita tine la piel aun apagada
+	// Con el oro encendido la costra y el coagulo tinen la piel de encima, al mismo nivel que el oro.
+	ALBEDO = mix(ALBEDO, vec3(0.05, 0.03, 0.035), negro * 0.7 * vivo);
+	ALBEDO = mix(ALBEDO, color_coagulo * 0.55, coagulo * 0.5 * vivo);
 	EMISSION = oro * encendido * luz;
 }
 """

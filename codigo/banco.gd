@@ -16,7 +16,10 @@ uniform float agachado = 0.0;   // 0..1: agachado los bordes se ensombrecen (sig
 void fragment() {
 	vec4 c = texture(pantalla, SCREEN_UV);
 	float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-	vec3 g = mix(c.rgb, vec3(l) * vec3(0.85, 0.95, 1.1), gris);
+	// El oro encendido no pierde el color con el tiempo detenido: las marcas se notan. Tras el tonemap el oro llega con el
+	// rojo saturado (r ~ 1, b 0,6-0,8); la piel no pasa de r ~ 0,88 y el cielo y los muros son azulados (medido).
+	float oro = smoothstep(0.93, 0.99, c.r) * smoothstep(0.03, 0.12, c.r - c.b);
+	vec3 g = mix(c.rgb, vec3(l) * vec3(0.85, 0.95, 1.1), gris * (1.0 - oro));
 	g = mix(g, vec3(1.0), flash);
 	float v = smoothstep(0.95, 0.3, distance(SCREEN_UV, vec2(0.5)));
 	g *= mix(1.0, v, gris * 0.6);
@@ -48,6 +51,10 @@ func _ready() -> void:
 	manos = Manos.new()
 	manos.cuerpo = jugador
 	jugador.camara.add_child(manos)
+	var sombra := CuerpoSombra.new()
+	sombra.jugador = jugador
+	sombra.manos = manos
+	jugador.add_child(sombra)
 	_crear_hud()
 	_cargar()
 	_aplicar_todo()
@@ -164,7 +171,7 @@ func _alternar_vitrina() -> void:
 
 func _poder(poder: String) -> void:
 	manos.lanzar_gesto(poder)
-	await get_tree().create_timer(manos.duracion() * 0.5).timeout   # el efecto sale en el pico del gesto
+	await get_tree().create_timer(manos.retardo_pico()).timeout   # el efecto sale en el pico del gesto
 	var tipo: String = _actual("vfx").tipo
 	match tipo:
 		"propio":

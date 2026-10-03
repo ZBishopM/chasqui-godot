@@ -21,6 +21,20 @@ var _gestos_anim: Dictionary = {}
 var _anim_reposo := ""
 var _dur_anim := 0.6
 var _clip_activo := ""
+## Arranque mas rapido de algunos gestos (poder -> velocidad hasta el pico del gesto): el Halcon tiene que responder a la
+## tecla. Pasado el pico el clip vuelve a su ritmo.
+const ARRANQUE := {"halcon": 2.0}
+const FIN_ARRANQUE := 0.45   # progreso del pico en los gestos "suave" de GestosLib (la mano llega arriba en 0,45)
+var _arranque := 1.0
+var _largo_clip := 0.6
+# Las marcas (venas) tienen su propio reloj: suben con la mano y se apagan mas despacio que ella.
+## Veces la duracion del gesto que dura el reloj de las marcas. Con 1,75 la parte visible (crecimiento > 0,1) dura un ~50 %
+## mas que cuando seguian al clip (medido: +45 a +55 % en los seis gestos); la subida no se estira, solo aguante y caida.
+const VENAS_DURACION := 1.75
+var _venas_t := 0.0
+var _venas_dur := 0.0         # 0 = sin marcas encendidas
+var _venas_pico := -1.0       # instante (s) en que llegaron al pico, -1 si aun no
+var _sostener := 0.0          # s que siguen en el pico (Colibri)
 # Venas de oro bajo la piel (PielVenas): al usar un poder se hinchan y encienden desde la mano hacia el codo con el esfuerzo
 # del gesto y luego vuelven a su tamaño de reposo; el brazo sin poder solo acompana.
 var venas_base := 0.5   # lo fija el juego: 0 sin poderes, 0.5 con poderes, sube hacia 1 con el Caos (el Monstruo)
@@ -85,6 +99,9 @@ func _montar_skel(e: Dictionary) -> void:
 	raiz.scale = Vector3.ONE * float(e.get("escala", 0.1))
 	raiz.rotation_degrees.y = float(e.get("yaw", 180.0))
 	add_child(raiz)
+	# Los brazos sueltos no dan sombra (en el suelo serian dos brazos flotando); la sombra la da CuerpoSombra.
+	for m: MeshInstance3D in raiz.find_children("*", "MeshInstance3D", true, false):
+		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if e.has("textura"):
 		var piel := StandardMaterial3D.new()
 		piel.albedo_texture = load(e.textura)
@@ -166,11 +183,32 @@ func lanzar_gesto(poder: String) -> void:
 		return
 	var a := _anim.get_animation(clip)
 	a.loop_mode = Animation.LOOP_NONE
-	_dur_anim = a.length
+	_largo_clip = a.length
+	_arranque = float(ARRANQUE.get(poder, 1.0))
+	_dur_anim = a.length * (FIN_ARRANQUE / _arranque + 1.0 - FIN_ARRANQUE)   # en segundos reales, con el arranque
 	_clip_activo = clip
+	_anim.speed_scale = _arranque
 	_anim.play(clip, MEZCLA_ENTRADA)
 	if not _anim.animation_finished.is_connected(_volver_al_reposo):
 		_anim.animation_finished.connect(_volver_al_reposo)
+	_venas_t = 0.0
+	_venas_pico = -1.0
+	_venas_dur = _dur_anim
+
+
+## Segundos desde la tecla hasta el pico del gesto en curso (progreso 0,5): ahi sale el efecto del poder.
+func retardo_pico() -> float:
+	return _largo_clip * (minf(0.5, FIN_ARRANQUE) / _arranque + maxf(0.0, 0.5 - FIN_ARRANQUE))
+
+
+## Mantiene las venas encendidas en su pico `seg` segundos (el Colibri: se notan mientras dura el tiempo detenido) y
+## luego se apagan con su cola normal.
+func sostener_venas(seg: float) -> void:
+	_sostener = seg
+	if _venas_dur <= 0.0:
+		_venas_dur = maxf(_dur_anim, 0.6)
+		_venas_t = 0.0
+		_venas_pico = -1.0
 
 
 ## 0..1 del gesto en curso (para sincronizar luz/VFX con el dolor de la mano); -1 si no hay gesto.
@@ -183,7 +221,37 @@ func progreso() -> float:
 func _volver_al_reposo(clip: StringName) -> void:
 	if clip != _anim_reposo:
 		_clip_activo = ""
+		_anim.speed_scale = 1.0
 		_anim.play(_anim_reposo, MEZCLA_SALIDA)
+
+
+## Progreso de las marcas (para la curva de esfuerzo de las venas), -1 si estan en reposo. Suben con la mano hasta el pico
+## del esfuerzo; despues el aguante y la caida se estiran para que el reloj dure VENAS_DURACION veces el gesto. Con
+## sostener_venas se quedan en el pico.
+func _progreso_venas(dt: float, p: float) -> float:
+	if _venas_dur <= 0.0:
+		return p   # un clip puesto a mano (capturar_picos): las venas siguen al clip
+	_venas_t += dt
+	if _sostener > 0.0:
+		_sostener -= dt
+		if _sostener <= 0.0:
+			_venas_pico = _venas_t   # la cola empieza ahora
+		return 0.6   # en el aguante: esfuerzo 1
+	if _venas_pico < 0.0:
+		if p >= 0.0 and p < AnimProc.T_PICO:
+			return p
+		_venas_pico = _venas_t
+	var cola := maxf(VENAS_DURACION * _venas_dur - _venas_pico_inicial(), 0.2)
+	var pv := AnimProc.T_PICO + (1.0 - AnimProc.T_PICO) * (_venas_t - _venas_pico) / cola
+	if pv >= 1.0:
+		_venas_dur = 0.0
+		return -1.0
+	return pv
+
+
+## Segundos desde la tecla hasta el pico del esfuerzo de las venas (lo que tarda la mano en subir).
+func _venas_pico_inicial() -> float:
+	return _largo_clip * (minf(AnimProc.T_PICO, FIN_ARRANQUE) / _arranque + maxf(0.0, AnimProc.T_PICO - FIN_ARRANQUE))
 
 
 ## Duracion (s) del ultimo gesto lanzado.
@@ -273,13 +341,16 @@ func _process(dt: float) -> void:
 	if _capas != null:
 		var quieto := cuerpo == null or (cuerpo.is_on_floor() and Vector2(cuerpo.velocity.x, cuerpo.velocity.z).length() < 0.3)
 		_capas.en_reposo = p < 0.0 and quieto
+	if _anim != null and _anim.speed_scale > 1.0 and p >= FIN_ARRANQUE:
+		_anim.speed_scale = 1.0   # pasado el pico, el gesto sigue a su ritmo
+	var pv := _progreso_venas(dt, p)
 	if _piel != null:
-		var meta := clampf(AnimProc.curva_esfuerzo(p), 0.0, 1.0) if p >= 0.0 else 0.0
+		var meta := clampf(AnimProc.curva_esfuerzo(pv), 0.0, 1.0) if pv >= 0.0 else 0.0
 		var sv := AnimProc.resorte(_crec, _crec_v, meta, 0.12, dt)
 		_crec = maxf(sv[0], 0.0)
 		_crec_v = sv[1]
 		_piel.set_shader_parameter("venas_base", venas_base)
 		_piel.set_shader_parameter("crecimiento", _crec)
 		_piel.set_shader_parameter("crecimiento_otro", _crec * 0.3)
-		_piel.set_shader_parameter("brillo", AnimProc.brillo_venas(_tiempo, p, mana))
+		_piel.set_shader_parameter("brillo", AnimProc.brillo_venas(_tiempo, pv, mana))
 		_piel.set_shader_parameter("brillo_otro", AnimProc.brillo_venas(_tiempo, -1.0, mana))

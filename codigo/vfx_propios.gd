@@ -257,6 +257,7 @@ static func _colibri(ctx: Dictionary) -> void:
 	_tiempo(ctx, escala)
 	ctx.banco.gris(1.0, 0.25)
 	_anillo(ctx.mundo, ctx.jugador.global_position + Vector3.UP * 0.1, Color(0.6, 0.8, 1.0), 10.0, 0.7)
+	ctx.banco.manos.sostener_venas(5.0)   # las marcas arden mientras el tiempo esta detenido
 	var tw: Tween = ctx.mundo.create_tween()
 	tw.tween_interval(5.0)
 	tw.tween_callback(func() -> void:
