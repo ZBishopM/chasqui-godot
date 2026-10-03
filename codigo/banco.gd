@@ -1,6 +1,7 @@
 extends Node3D
 ## Banco de combinaciones de Chasqui: arena greybox + jugador en primera persona.
 ## Teclas: 1 manos · 2 personaje · 3 VFX · 4 estilo (Mayus = anterior) · F G R T V C poderes · Mayus esprintar · Ctrl agacharse
+##         F2 nivel 1 (y vuelta)
 ##         Tab vitrina · K guardar combinacion · F1 ocultar HUD · Esc libera el mouse
 
 const ARCHIVO := "res://combinacion.json"
@@ -79,8 +80,15 @@ func _unhandled_input(ev: InputEvent) -> void:
 		_guardar()
 	elif k.keycode == KEY_O:
 		_ofrenda()
+	elif k.keycode == KEY_F2:
+		get_tree().change_scene_to_file.call_deferred(_escena_alterna())
 	elif k.keycode == KEY_F1:
 		_hud.visible = not _hud.visible
+
+
+## Escena a la que lleva F2 (el nivel la redefine para volver al banco).
+func _escena_alterna() -> String:
+	return "res://escenas/nivel1.tscn"
 
 
 # --- Seleccion -----------------------------------------------------------------------------------

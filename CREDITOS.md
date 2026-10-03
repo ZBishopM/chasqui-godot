@@ -15,6 +15,9 @@ Al añadir un pack: copiar aquí autor, licencia y URL (confirmando la licencia 
 | V3 | Elemental Magic FX, versión gratis (fuego: proyectil, área, casting) | Binbun | CC0 (`license.txt` del pack) | https://binbun3d.itch.io/elemental-magic-fx | `assets/BinbunVFX_Vol2/` |
 | V4 | Loot VFX (ofrendas / oro sagrado) | Binbun | CC0 (según su página) | https://binbun3d.itch.io/loot-vfx | `assets/BinbunVFX/loot_effects/` |
 | P1, V1 | Humanoide procedural, VFX propios | Chasqui | propia | — | `codigo/personajes.gd`, `codigo/vfx_propios.gd` |
+| — | Sky3D 2.1 (cielo, sol, luna, estrellas, nubes y niebla por hora) | Cory Petkovsek, J. Cuéllar y colaboradores | MIT (`addons/sky_3d/LICENSE.txt`) | https://github.com/TokisanGames/Sky3D | `addons/sky_3d/` |
+| — | ↳ Panorama de la Vía Láctea (`Milkyway.jpg`) | ESO/S. Brunier | **CC BY 4.0: hay que citarlo** | https://www.eso.org/public/images/eso0932a/ | `addons/sky_3d/assets/thirdparty/` |
+| — | ↳ Mapa de la luna (`MoonMap.png`) | GPoSM | MIT | ver `addons/sky_3d/ThirdParty.md` | `addons/sky_3d/assets/thirdparty/` |
 
 Notas:
 - Binbun pide, sin obligar, mencionar «Binbun3D» o «bun3d.com».
