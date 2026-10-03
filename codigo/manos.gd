@@ -59,6 +59,9 @@ var _salto_v := 0.0
 var _en_suelo := true
 var _vy := 0.0
 var _peso_caida := 1.0   # 0..1: cuanto pesa el ultimo aterrizaje
+# Al agacharse la cabeza baja de golpe y las manos se quedan un instante arriba (al levantarse, abajo); el mismo resorte.
+const AGACHAR_GOLPE := 0.45      # m/s que recibe el resorte al agacharse o levantarse
+var _agachado := false
 
 
 func montar(e: Dictionary) -> void:
@@ -200,6 +203,10 @@ func _salto(dt: float) -> void:
 		var caida := clampf(-_vy, 0.0, SALTO_CAIDA_MAX)
 		_peso_caida = caida / SALTO_CAIDA_MAX
 		_salto_v -= caida * SALTO_IMPACTO
+	if cuerpo.agachado != _agachado:
+		_agachado = cuerpo.agachado
+		_peso_caida = 0.5
+		_salto_v += AGACHAR_GOLPE * (1.0 if _agachado else -1.0)
 	_en_suelo = en_suelo
 	_vy = vy
 	var objetivo := 0.0 if en_suelo else clampf(vy * SALTO_AIRE, -SALTO_TOPE, SALTO_TOPE)

@@ -1,6 +1,6 @@
 extends Node3D
 ## Banco de combinaciones de Chasqui: arena greybox + jugador en primera persona.
-## Teclas: 1 manos · 2 personaje · 3 VFX · 4 estilo (Mayus = anterior) · F G R T V C poderes · Mayus esprintar
+## Teclas: 1 manos · 2 personaje · 3 VFX · 4 estilo (Mayus = anterior) · F G R T V C poderes · Mayus esprintar · Ctrl agacharse
 ##         Tab vitrina · K guardar combinacion · F1 ocultar HUD · Esc libera el mouse
 
 const ARCHIVO := "res://combinacion.json"
@@ -12,6 +12,7 @@ shader_type canvas_item;
 uniform sampler2D pantalla : hint_screen_texture, repeat_disable, filter_linear;
 uniform float flash = 0.0;
 uniform float gris = 0.0;
+uniform float agachado = 0.0;   // 0..1: agachado los bordes se ensombrecen (sigilo)
 void fragment() {
 	vec4 c = texture(pantalla, SCREEN_UV);
 	float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
@@ -19,6 +20,8 @@ void fragment() {
 	g = mix(g, vec3(1.0), flash);
 	float v = smoothstep(0.95, 0.3, distance(SCREEN_UV, vec2(0.5)));
 	g *= mix(1.0, v, gris * 0.6);
+	float bordes = smoothstep(0.22, 0.75, distance(SCREEN_UV, vec2(0.5)));
+	g *= 1.0 - agachado * 0.78 * bordes;
 	COLOR = vec4(g, 1.0);
 }
 """
@@ -206,6 +209,10 @@ func _apuntar() -> Vector3:
 
 # --- Pantalla (flash del rayo, gris del Colibri) --------------------------------------------------
 
+func _process(_dt: float) -> void:
+	_mat_pantalla.set_shader_parameter("agachado", jugador.agacharse)
+
+
 func flash(valor: float, seg: float) -> void:
 	_mat_pantalla.set_shader_parameter("flash", valor)
 	create_tween().tween_method(func(v: float) -> void: _mat_pantalla.set_shader_parameter("flash", v), valor, 0.0, seg)
@@ -231,6 +238,7 @@ func _crear_hud() -> void:
 	_mat_pantalla.shader = sh
 	_mat_pantalla.set_shader_parameter("flash", 0.0)
 	_mat_pantalla.set_shader_parameter("gris", 0.0)
+	_mat_pantalla.set_shader_parameter("agachado", 0.0)
 	rect.material = _mat_pantalla
 	capa_fx.add_child(rect)
 
@@ -257,7 +265,7 @@ func _actualizar_hud() -> void:
 	lineas.append("")
 	lineas.append("F Halcon · G Sapo · R Amaru · T Condor · V Puma · C Colibri (Mayus+C ralentiza)")
 	lineas.append("O ofrenda (Loot VFX, rareza cicla) · Mayus+1..4 anterior · Tab vitrina · K guardar · F1 ocultar · Esc mouse")
-	lineas.append("WASD andar · Mayus esprintar · Espacio saltar")
+	lineas.append("WASD andar · Mayus esprintar · Ctrl agacharse · Espacio saltar")
 	_hud.text = "\n".join(lineas)
 
 
@@ -461,7 +469,7 @@ func _cargar() -> void:
 func _registrar_input() -> void:
 	var teclas := {
 		"adelante": KEY_W, "atras": KEY_S, "izquierda": KEY_A, "derecha": KEY_D,
-		"saltar": KEY_SPACE, "liberar_mouse": KEY_ESCAPE, "esprintar": KEY_SHIFT,
+		"saltar": KEY_SPACE, "liberar_mouse": KEY_ESCAPE, "esprintar": KEY_SHIFT, "agacharse": KEY_CTRL,
 	}
 	for nombre: String in teclas:
 		if not InputMap.has_action(nombre):

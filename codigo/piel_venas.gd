@@ -10,7 +10,8 @@ extends RefCounted
 ##   - al usar un poder, `crecimiento` avanza de los nudillos al codo: por detras del frente las venas se hinchan al 100 %
 ##     y el oro se enciende con `brillo` (la curva de esfuerzo y el espasmo del gesto); despues vuelven a `venas_base`.
 ##
-## Se tocan en vivo: altura (m), grosor (1 = Caos bajo; ~1,5 = Caos alto), luz, luz_reposo, latido, color_oro.
+## Se tocan en vivo: altura (m), grosor (1 = Caos bajo; ~1,5 = Caos alto), luz, luz_reposo, latido, color_oro (el oro
+## sucio de la vena), color_pepita, pepitas y pepitas_escala (las pepitas de oro en bruto).
 
 const SHADER := """
 shader_type spatial;
@@ -25,8 +26,13 @@ uniform float crecimiento = 0.0;       // 0..1 desde los nudillos: hasta donde l
 uniform float crecimiento_otro = 0.0;  // lo mismo para el otro brazo
 uniform float brillo = 1.0;            // AnimProc.brillo_venas del brazo del poder (~1 en reposo, ~2,6 en el pico)
 uniform float brillo_otro = 1.0;
-uniform vec3 color_oro : source_color = vec3(1.0, 0.66, 0.16);
-uniform float luz = 1.6;               // energia del oro encendido
+// Oro en bruto: la vena es oro sucio (ocre, apagado) con pepitas de oro mas puro que destellan. Antes era un amarillo
+// limpio que en el pico se lavaba casi a blanco.
+uniform vec3 color_oro : source_color = vec3(0.62, 0.40, 0.11);
+uniform vec3 color_pepita : source_color = vec3(1.0, 0.80, 0.38);
+uniform float pepitas = 1.0;           // cuanto brillan las pepitas (0 = sin pepitas)
+uniform float pepitas_escala = 260.0;  // pepitas por unidad de UV (mas = mas pequenas)
+uniform float luz = 1.15;              // energia del oro encendido
 uniform float luz_reposo = 0.08;       // fraccion de luz que conserva el oro en reposo
 uniform float latido = 0.12;           // cuanto late la vena (altura) con el pulso
 uniform float rugosidad = 0.62;
@@ -48,6 +54,18 @@ varying vec3 v_aleja;    // direccion en la piel que se aleja de la vena (vista)
 float perfil(float x) {
 	float t = clamp(1.0 - x * x, 0.0, 1.0);
 	return t * t * t;
+}
+
+float azar(vec2 p) {
+	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+// Ruido de valor suave, 0..1.
+float ruido(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(azar(i), azar(i + vec2(1.0, 0.0)), f.x), mix(azar(i + vec2(0.0, 1.0)), azar(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 
 // Pulso doble del corazon (lub-dub), 0..1.
@@ -99,7 +117,13 @@ void fragment() {
 	// El oro bajo la piel: nucleo dorado y un halo algo mas ancho y mas rojo (la luz que atraviesa la carne), que muere a
 	// 3 semianchos del eje (v_r = 1).
 	float halo = perfil(v_r);
-	vec3 oro = color_oro * nucleo * nucleo + color_oro * vec3(1.0, 0.45, 0.25) * halo * 0.18;
+	// Pepitas: manchas de ruido de valor en las UV (pegadas a la piel, no resbalan al mover el brazo), solo en el nucleo,
+	// de dos tamanos, que titilan un poco.
+	float n = ruido(UV * pepitas_escala) * 0.7 + ruido(UV * pepitas_escala * 2.3 + 17.0) * 0.3;
+	float pepita = smoothstep(0.66, 0.86, n) * smoothstep(0.25, 0.7, nucleo) * pepitas;
+	pepita *= 0.85 + 0.15 * sin(TIME * 2.3 + n * 40.0);
+	vec3 oro = color_oro * nucleo * nucleo + color_oro * vec3(1.0, 0.45, 0.25) * halo * 0.18 + color_pepita * pepita * 1.6;
+	ALBEDO = mix(ALBEDO, ALBEDO * vec3(1.05, 0.92, 0.7), pepita * 0.6 * v_tam);   // la pepita tine la piel aun apagada
 	float flujo = 0.75 + 0.25 * sin(v_g * 70.0 - TIME * 10.0);   // pulsos de oro que corren hacia el codo
 	float encendido = luz_reposo * (1.0 + 0.6 * pulso(TIME)) * v_tam + 0.6 * v_encendido * flujo + v_frente;
 	EMISSION = oro * encendido * luz;
