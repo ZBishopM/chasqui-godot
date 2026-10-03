@@ -26,6 +26,7 @@ El editor y la demo que lanza Claude (por el MCP de Godot) **conviven**: son dos
 | Tecla | Hace |
 |---|---|
 | WASD · Espacio · mouse | moverse, saltar, mirar |
+| `Mayús` (mantener, hacia delante) · `Ctrl` (mantener) | esprintar · agacharse |
 | `1` manos · `2` personaje · `3` VFX · `4` estilo | siguiente candidato (con **Mayús**: el anterior) |
 | `F` Halcón · `G` Sapo · `R` Amaru · `T` Cóndor · `V` Puma · `C` Colibrí | poderes (Mayús+`C`: ralentiza en vez de detener) |
 | `O` | ofrenda: efecto de recogida (Loot VFX de Binbun) en el suelo, de común a mítico |
@@ -67,7 +68,25 @@ godot.console.exe --headless --path . --script res://herramientas/retargetear_h4
 
 Capa de resorte sobre la altura de las manos (`Manos._salto`): al despegar se quedan atrás, en el aire flotan, y al tocar el suelo se hunden con un golpe proporcional a la caída y suben sin rebotar, como en tierra o pasto. El peso depende de la altura: una caída corta es ligera y rápida (0,15 m: −0,6 cm, quietas en 0,16 s) y desde `SALTO_CAIDA_MAX` (5 m/s, un salto normal en plano) es la más pesada (−4 cm, quietas en ~0,45 s); caer de más alto no la pasa. Se ajusta con las constantes `SALTO_*` de `codigo/manos.gd`.
 
-La patada de FOV del Halcón (+16°) siempre vuelve al FOV de reposo del rig, aunque se pulse F seguido; el hundimiento del Sapo tampoco se acumula (`VfxPropios._tween_unico`).
+## Moverse: andar, esprintar, agacharse
+
+- **Andar** (5 m/s): las manos se balancean en un ocho, un rebote por pisada (`BOB`, `PASO_LARGO` en `manos.gd`).
+- **Esprintar** (Mayús, 8 m/s): las manos bajan, se cierran en puño y bombean al ritmo del paso (`CapasManos`: `BOMBEO_GRADOS`, `CODO_GRADOS`). El puño no es procedural: se copia del puño hecho a mano de los gestos (`PUNO_CLIP`: izquierda de Halcón, derecha de Cóndor). H4 gira además el antebrazo `giro_puno` (catálogo) para que el puño quede como el de H3.
+- **Agacharse** (Ctrl): cámara de 1,6 a 1,0 m, 2,5 m/s, sin esprint ni salto; al soltar solo se levanta si cabe. Los bordes de la pantalla se oscurecen (`agachado` en `SHADER_PANTALLA`).
+- **FOV:** el jugador es su único dueño: el del rig de manos + la patada del Halcón (+16°, nunca se acumula) + 15° al esprintar. Las manos se dibujan siempre con el FOV del rig (`fov_manos` de `PielVenas`), así que al abrirse el mundo los antebrazos no se estiran.
+- **Tics de reposo** (`CapasManos`, primera versión, pendiente de pulir): quieto y sin poder, de vez en cuando una mano tamborilea, se estira o aprieta.
+
+`CapasManos` es un `SkeletonModifier3D`: corre después del `AnimationPlayer` y suma todo esto encima de los clips, sin tocarlos.
+
+## Sombra del jugador
+
+Los brazos en primera persona no dan sombra. La da `CuerpoSombra`: el maniquí de Quaternius (UAL), invisible para la cámara (`SHADOWS_ONLY`), colgado del jugador. Anima reposo, trote, esprint, agachado y salto según el estado del jugador, y sus brazos apuntan adonde apuntan los brazos en primera persona (`BrazosSombra`). No copia los puños ni el bombeo del esprint.
+
+## Tiempos de los poderes
+
+- El **Halcón** sube al doble de velocidad hasta el pico (`ARRANQUE` en `manos.gd`): mano arriba a los 286 ms de la tecla y despegue a los 358 ms. El efecto de cada poder sale en el pico de su gesto (`Manos.retardo_pico()`).
+- Las **marcas** (venas) tienen su propio reloj: suben con la mano y se apagan más despacio; la parte visible dura ~50 % más que el gesto (`VENAS_DURACION` = 1,75). El **Colibrí** las deja en el pico los 5 s del tiempo detenido (`Manos.sostener_venas`), y el gris de la pantalla respeta el oro encendido.
+- La patada de FOV del Halcón y el hundimiento del Sapo no se acumulan al repetir el poder (`VfxPropios._tween_unico`).
 
 ## Venas de oro bajo la piel
 
@@ -76,8 +95,9 @@ Las venas son bultos de la propia piel, no mallas encima: abultan el antebrazo y
 - **Piel densa:** `piel=` en el catálogo carga la malla de los brazos con el antebrazo, la muñeca y el dorso/palma partidos hasta aristas de 2,5 mm (`escenas/piel_h3.res`, `piel_h4.res`; `codigo/malla_densa.gd`). Así una vena tiene vértices de sobra a lo ancho.
 - **La red de venas** (`herramientas/campo_venas.gd`) se hornea en esos vértices: curvas irregulares en el antebrazo (las que vienen del dorso, dos gruesas por la cara interna y ramas en Y) y en el dorso de la mano (una entre cada par de nudillos y el arco que las cruza), con varices y puntas que se hunden. Cada vértice guarda su distancia a la vena más cercana.
 - **El shader** (`codigo/piel_venas.gd`, `PielVenas`) empuja la piel por la normal con un perfil de bulto, inclina la normal para que la luz dibuje el relieve y enciende el oro: núcleo dorado y halo rojizo, como luz que atraviesa la carne.
+- **Oro en bruto e infectado:** la vena es oro sucio (ocre) con pepitas de oro más puro. Cuando arde, lleva dentro, como lava viva, costras negras que derivan con el borde al rojo y coágulos rojos que se forman y se deshacen; en reposo la infección no se ve.
 - **Estados** (los mueve `Manos`): en reposo las venas tienen el tamaño `Manos.venas_base` (lo fija el juego: 0 sin poderes, 0,5 con poderes, sube hacia 1 con el Caos) y el oro solo late. Al usar un poder, un frente sube de los nudillos al codo con la curva de esfuerzo del gesto: por detrás las venas se hinchan al 100 % y el oro se enciende (`AnimProc.brillo_venas`, con su espasmo); luego vuelven a `venas_base`. El brazo sin poder acompaña al 30 %. `Manos.mana` (0–1) apaga el oro con el maná vacío.
-- **Se tocan en vivo** (parámetros del material): `altura` (m), `grosor` (1 = Caos bajo, ~1,5 = Caos alto), `luz`, `luz_reposo`, `latido`, `color_oro`.
+- **Se tocan en vivo** (parámetros del material): `altura` (m), `grosor` (1 = Caos bajo, ~1,5 = Caos alto), `luz`, `luz_reposo`, `latido`, `color_oro`, `color_pepita`, `pepitas`, `pepitas_escala`, `infeccion`, `coagulos`, `color_coagulo`.
 
 Volver a hornear si cambia el modelo o el trazado (`SEMILLA` en `hornear_piel.gd` da otra red igual de verosímil):
 
@@ -91,6 +111,8 @@ godot.console.exe --headless --path . --script res://herramientas/hornear_piel.g
 
 - `probar(poder, instantes)` y `probar_todo()`: lanzan los poderes y guardan capturas en `capturas/`.
 - `capturar_picos()`: congela cada gesto de las manos en su pico y guarda `manos_<id>_<poder>.png`.
-- `medir_suavidad()`: velocidad angular máxima del hueso más rápido durante cada gesto (°/s). Un salto de 90° en un frame da más de 10 000; un gesto fluido queda bajo ~700. Estado actual: H3 260–510 °/s, H4 410–730 °/s.
+- `medir_suavidad()`: velocidad angular máxima del hueso más rápido durante cada gesto (°/s). Un salto de 90° en un frame da más de 10 000; un gesto fluido queda bajo ~700. Estado actual: H3 260–560 °/s y H4 290–590 °/s, salvo el Halcón (arranque al doble): 769 °/s en H3 y 1007 °/s en H4.
+- `capturar_secuencia(nombre, n, intervalo, lado)`: tira de cuadros en un PNG, para ver movimiento en una imagen.
+- `capturar_brazo(nombre, giro, alambre, distancia)`: primer plano del antebrazo desde fuera del cuerpo.
 
 Humo sin ventana: `godot.console.exe --headless --path . --quit-after 120` (**N son frames**, ~60/s; nunca `godot.exe`, traga la salida).
