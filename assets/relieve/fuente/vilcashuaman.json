@@ -1,0 +1,14 @@
+{
+	"altura_centro_m": 3482.37939453125,
+	"centro_px": [
+		648.000000000025,
+		647.999999999999
+	],
+	"fuente": "Copernicus GLO-30 DEM (DGED 2021/1), piezas S14 W074 y W075",
+	"grados_por_px": 0.000277777777777778,
+	"lado_px": 1296,
+	"lat_norte": -13.4729998779297,
+	"lon_oeste": -74.1330029296875,
+	"m_por_px_x": 30.0484552479723,
+	"m_por_px_z": 30.9222222222222
+}

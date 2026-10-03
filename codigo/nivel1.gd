@@ -13,12 +13,15 @@ const MINUTOS_POR_DIA := 20.0  # un dia entero dura 20 min de juego
 const AMANECER := 6.25         # hora a la que salta Inicio (el sol asoma hacia las 6:20)
 
 var cielo: Sky3D
+var terreno: Terreno
 var _hora: Label
 
 
 func _ready() -> void:
 	super._ready()
-	jugador.camara.far = 30000.0   # el fondo llega a decenas de km
+	jugador.camara.far = 40000.0   # el fondo llega a ~20 km en cada direccion
+	jugador.position.y = terreno.altura(jugador.position.x, jugador.position.z) + 0.3
+	cielo.sun.directional_shadow_max_distance = 600.0   # las lomas cercanas tambien dan sombra
 	_hora = Label.new()
 	_hora.position = Vector2(16, 300)
 	_hora.add_theme_font_size_override("font_size", 18)
@@ -43,6 +46,12 @@ func _crear_entorno() -> void:
 	tod.day = FECHA[2]
 	cielo.current_time = HORA_INICIAL
 	cielo.minutes_per_day = MINUTOS_POR_DIA
+	# Niebla para un valle andino seco de ~40 km (la de Sky3D viene para 1 km). Su "nivel del mar" corta los rayos que
+	# bajan de y = 0 (la plaza) y dibujaba una raya recta en el horizonte: se baja por debajo de todo el relieve.
+	cielo.sky.fog_sea_level = -2000.0
+	cielo.sky.fog_density = 0.00006
+	cielo.sky.fog_end = 30000.0
+	cielo.sky.fog_falloff = 1.0
 	var env := cielo.environment
 	env.glow_enabled = true
 	env.glow_intensity = 0.5
@@ -51,43 +60,10 @@ func _crear_entorno() -> void:
 	env.ssao_enabled = true
 
 
-## Provisional (N0): un llano grande y unos cerros lejanos de prueba para leer la luz y la niebla. El relieve real de
-## Vilcashuaman llega en el N1.
+## El relieve real de Vilcashuaman (Terreno): la plaza en el origen, +X este, -Z norte.
 func _crear_arena() -> void:
-	var suelo := StaticBody3D.new()
-	var malla := MeshInstance3D.new()
-	var plano := PlaneMesh.new()
-	plano.size = Vector2(6000, 6000)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.36, 0.31, 0.22)
-	mat.roughness = 0.95
-	plano.material = mat
-	malla.mesh = plano
-	suelo.add_child(malla)
-	var col := CollisionShape3D.new()
-	var caja := BoxShape3D.new()
-	caja.size = Vector3(6000, 1, 6000)
-	col.shape = caja
-	col.position.y = -0.5
-	suelo.add_child(col)
-	add_child(suelo)
-	var piedra := StandardMaterial3D.new()
-	piedra.albedo_color = Color(0.45, 0.42, 0.38)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 1532
-	for i in 18:
-		var cerro := MeshInstance3D.new()
-		var cono := CylinderMesh.new()
-		cono.top_radius = 0.0
-		cono.bottom_radius = rng.randf_range(500, 1400)
-		cono.height = rng.randf_range(300, 1100)
-		cono.radial_segments = 7
-		cono.material = piedra
-		cerro.mesh = cono
-		var ang := TAU * i / 18.0 + rng.randf_range(-0.1, 0.1)
-		var dist := rng.randf_range(2500, 9000)
-		cerro.position = Vector3(cos(ang) * dist, cono.height * 0.5 - 60.0, sin(ang) * dist)
-		add_child(cerro)
+	terreno = Terreno.new()
+	add_child(terreno)
 
 
 func _montar_dummies() -> void:
