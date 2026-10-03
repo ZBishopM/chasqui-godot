@@ -18,7 +18,6 @@ var sk: Skeleton3D
 var vista: Basis
 var h: Dictionary
 var izq: bool
-var _huesos: Array[int] = []
 
 
 ## `h`: nombres de huesos: brazo, antebrazo, muneca, palma_medio, palma_indice, palma_menique, dedos (patrones con %d),
@@ -79,6 +78,12 @@ func _seg(patron: String, falange: int) -> Array[int]:
 	return [a, b]
 
 
+## Direccion de una falange: hacia la siguiente o, si la punta no tiene hueso (H3 no trae `_end`), su eje Y local, que en
+## los rigs de Blender va a lo largo del hueso.
+func _dir_seg(s: Array[int]) -> Vector3:
+	return pos(s[1]) - pos(s[0]) if s[1] >= 0 else base(s[0]) * Vector3.UP
+
+
 # --- grados de libertad ----------------------------------------------------------------------
 
 ## spec: grado_de_libertad -> grados. Devuelve hueso -> [eje_local, grados] acumulables.
@@ -120,8 +125,7 @@ func rotaciones(spec: Dictionary) -> Dictionary:
 			"pulgar_flex":
 				for f in range(1, 4):
 					var s := _seg(h.pulgar, f)
-					var dir := pos(s[1]) - pos(s[0])
-					_sumar(r, s[0], hacia(s[0], dir, n), g * PESO_FALANGE[f - 1])
+					_sumar(r, s[0], hacia(s[0], _dir_seg(s), n), g * PESO_FALANGE[f - 1])
 	return r
 
 
@@ -130,7 +134,7 @@ func _dedos(r: Dictionary, n: Vector3, l: Vector3, g: float, abrir: bool, ola: b
 		var patron: String = h.dedos[k]
 		for f in range(1, 4):
 			var s := _seg(patron, f)
-			var dir := pos(s[1]) - pos(s[0])
+			var dir := _dir_seg(s)
 			if abrir:
 				if f == 1:
 					_sumar(r, s[0], hacia(s[0], dir, l), g * ABRIR_DEDO[k])

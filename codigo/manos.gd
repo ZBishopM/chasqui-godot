@@ -1,7 +1,8 @@
 class_name Manos
 extends Node3D
 ## Manos en primera persona: monta el candidato elegido (brazos con Skeleton3D) y reproduce los clips de gesto de cada poder.
-## Capas: respiracion + sway de mirada (resorte) sobre este nodo; el gesto lo pone el AnimationPlayer `Gestos` de la escena.
+## Capas: respiracion + sway de mirada (resorte) sobre este nodo; el gesto lo pone el AnimationPlayer `Gestos` de la escena,
+## y los tics de reposo (dedos, muneca) CapasManos, encima de la animacion.
 
 const MEZCLA_ENTRADA := 0.15   # s: del reposo al gesto
 const MEZCLA_SALIDA := 0.4     # s: del gesto al reposo (mas lenta: es lo que se notaba brusco)
@@ -14,6 +15,7 @@ var _sway := Vector2.ZERO
 var _sway_v := Vector2.ZERO
 var _anim: AnimationPlayer
 var _sk: Skeleton3D
+var _capas: CapasManos   # tics de reposo encima de la animacion
 # Cada poder reproduce un clip y luego vuelve al reposo.
 var _gestos_anim: Dictionary = {}
 var _anim_reposo := ""
@@ -54,6 +56,7 @@ func montar(e: Dictionary) -> void:
 		h.queue_free()
 	_anim = null
 	_sk = null
+	_capas = null
 	_gestos_anim = {}
 	_clip_activo = ""
 	_piel = null
@@ -100,6 +103,9 @@ func _montar_skel(e: Dictionary) -> void:
 		_anim.play(_anim_reposo)
 		_anim.advance(0.0)
 	_sk = _buscar(raiz, "Skeleton3D") as Skeleton3D
+	_capas = CapasManos.new()
+	_capas.preparar(_sk, float(e.get("yaw", 180.0)))   # con el esqueleto en el reposo que acaba de poner el AnimationPlayer
+	_sk.add_child(_capas)
 	var cam_i := _sk.find_bone(HUESOS.ojo)
 	if cam_i >= 0:
 		# El rig trae un hueso de camara/cabeza: el ojo del jugador va ahi (mas el desplazo del catalogo).
@@ -214,8 +220,11 @@ func _process(dt: float) -> void:
 	position = Vector3(_sway.x + resp.x, _sway.y + resp.y + _salto_y, 0.0)
 	rotation.x = _salto_y * SALTO_CABECEO
 
+	var p := progreso()
+	if _capas != null:
+		var quieto := cuerpo == null or (cuerpo.is_on_floor() and Vector2(cuerpo.velocity.x, cuerpo.velocity.z).length() < 0.3)
+		_capas.en_reposo = p < 0.0 and quieto
 	if _piel != null:
-		var p := progreso()
 		var meta := clampf(AnimProc.curva_esfuerzo(p), 0.0, 1.0) if p >= 0.0 else 0.0
 		var sv := AnimProc.resorte(_crec, _crec_v, meta, 0.12, dt)
 		_crec = maxf(sv[0], 0.0)

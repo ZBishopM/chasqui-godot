@@ -359,6 +359,36 @@ func capturar_brazo(nombre: String, giro := 0.0, alambre := false, distancia := 
 	return ruta
 
 
+## Tira de cuadros para ver movimiento en una sola imagen: `n` capturas cada `intervalo` s de la parte de abajo de la
+## pantalla (donde estan las manos), en filas de 4. `lado` ".L"/".R" recorta a la mitad de esa mano; "" deja las dos
+## reducidas a la mitad. Sin HUD. Se usa desde el MCP.
+func capturar_secuencia(nombre: String, n := 8, intervalo := 0.2, lado := "") -> String:
+	_hud.visible = false
+	var cuadros: Array[Image] = []
+	for k in n:
+		await RenderingServer.frame_post_draw
+		var img := get_viewport().get_texture().get_image()
+		var w := img.get_width()
+		var y0 := int(img.get_height() * 0.4)
+		var x0 := 0 if lado != ".R" else w - int(w * 0.5)
+		img = img.get_region(Rect2i(x0, y0, w if lado == "" else int(w * 0.5), img.get_height() - y0))
+		var escala := 0.5 if lado == "" else 0.7
+		img.resize(int(img.get_width() * escala), int(img.get_height() * escala))
+		cuadros.append(img)
+		if k < n - 1:
+			await get_tree().create_timer(intervalo).timeout
+	_hud.visible = true
+	var ancho := cuadros[0].get_width()
+	var alto := cuadros[0].get_height()
+	var cols := mini(4, n)
+	var hoja := Image.create(ancho * cols, alto * ceili(n / float(cols)), false, cuadros[0].get_format())
+	for k in n:
+		hoja.blit_rect(cuadros[k], Rect2i(0, 0, ancho, alto), Vector2i((k % cols) * ancho, floori(k / float(cols)) * alto))
+	var ruta := ProjectSettings.globalize_path("res://capturas/%s.png" % nombre)
+	hoja.save_png(ruta)
+	return ruta
+
+
 ## Mide cuanto se mueve el hueso mas rapido de las manos durante cada gesto (entrada, pico y vuelta al reposo), en grados/s.
 ## Un salto de 90 grados en un solo frame da >10000; un gesto fluido queda por debajo de unos 700. Se usa desde el MCP.
 func medir_suavidad() -> String:
