@@ -19,55 +19,39 @@ const SHADER := """
 shader_type spatial;
 render_mode cull_disabled;   // los faldones se ven por las dos caras
 
-uniform sampler2D alt_lejos : filter_linear, repeat_disable;
-uniform sampler2D alt_cerca : filter_linear, repeat_disable;
-uniform vec2 m_por_px;     // metros por pixel del relieve lejano
-uniform vec2 centro_px;    // pixel de la plaza en el relieve lejano
-uniform vec2 tam_lejos;
-uniform float lado_cerca;
-uniform float paso_cerca;
+#include "res://codigo/relieve.gdshaderinc"
+
 uniform float faldon = 30.0;
+// Texturas de suelo (Poly Haven, CC0): hierba seca, tierra con piedras y roca. Se ven de cerca; lejos se funden con
+// colores medios para que no se note la repeticion.
+uniform sampler2D tex_hierba : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D nor_hierba : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D tex_tierra : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D nor_tierra : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D tex_roca : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D nor_roca : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float escala_suelo = 3.0;   // m que cubre cada repeticion de la textura de suelo
+uniform float escala_roca = 7.0;
 uniform vec3 color_ichu : source_color = vec3(0.58, 0.49, 0.31);
 uniform vec3 color_verde : source_color = vec3(0.33, 0.38, 0.22);
 uniform vec3 color_tierra : source_color = vec3(0.46, 0.37, 0.27);
 uniform vec3 color_roca : source_color = vec3(0.43, 0.40, 0.36);
+uniform float sombra_nubes = 0.35;  // cuanto oscurecen las sombras de las nubes que corren con el viento
 
 varying vec3 v_pos;
 varying vec3 v_normal;
 
-float h_lejos(vec2 xz) {
-	return texture(alt_lejos, (centro_px + xz / m_por_px + 0.5) / tam_lejos).r;
+// Textura proyectada desde arriba, con dos escalas mezcladas para romper la repeticion.
+vec3 cenital(sampler2D t, vec2 xz, float escala) {
+	return mix(texture(t, xz / escala).rgb, texture(t, xz / (escala * 3.7) + 0.31).rgb, 0.35);
 }
 
-float h_cerca(vec2 xz) {
-	float n = lado_cerca / paso_cerca + 1.0;
-	return texture(alt_cerca, ((xz + lado_cerca * 0.5) / paso_cerca + 0.5) / n).r;
+// Roca en tres proyecciones (triplanar): en las paredes no se estira.
+vec3 triplanar(sampler2D t, vec3 p, vec3 n, float escala) {
+	vec3 w = pow(abs(n), vec3(4.0));
+	w /= (w.x + w.y + w.z);
+	return texture(t, p.zy / escala).rgb * w.x + texture(t, p.xz / escala).rgb * w.y + texture(t, p.xy / escala).rgb * w.z;
 }
-
-float altura(vec2 xz) {
-	return max(abs(xz.x), abs(xz.y)) <= lado_cerca * 0.5 ? h_cerca(xz) : h_lejos(xz);
-}
-
-vec3 normal_en(vec2 xz) {
-	float e = max(abs(xz.x), abs(xz.y)) <= lado_cerca * 0.5 - paso_cerca ? paso_cerca : m_por_px.x;
-	float hx = altura(xz - vec2(e, 0.0)) - altura(xz + vec2(e, 0.0));
-	float hz = altura(xz - vec2(0.0, e)) - altura(xz + vec2(0.0, e));
-	return normalize(vec3(hx, 2.0 * e, hz));
-}
-
-// Hash sin seno (Dave Hoskins, "hash without sine"): con coordenadas de miles de celdas el de fract(sin) se rompe.
-float azar(vec2 p) {
-	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-	p3 += dot(p3, p3.yzx + 33.33);
-	return fract((p3.x + p3.y) * p3.z);
-}
-float ruido(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	f = f * f * (3.0 - 2.0 * f);
-	return mix(mix(azar(i), azar(i + vec2(1, 0)), f.x), mix(azar(i + vec2(0, 1)), azar(i + vec2(1, 1)), f.x), f.y);
-}
-float fbm(vec2 p) { return ruido(p) * 0.5 + ruido(p * 2.1 + 3.7) * 0.3 + ruido(p * 4.3 + 9.1) * 0.2; }
 
 void vertex() {
 	vec2 xz = VERTEX.xz;
@@ -82,23 +66,63 @@ void fragment() {
 	float pend = 1.0 - n.y;                                 // 0 llano, ~0.3 a 45 grados
 	float alt = v_pos.y;                                    // relativa a la plaza (3482 m)
 	vec2 p = v_pos.xz;
-	// variacion a varias escalas (sin mod: envolver el dominio deja una costura en x = 0 y z = 0)
+	float dist = length(v_pos - CAMERA_POSITION_WORLD);
 	float v1 = fbm(p / 37.0);
-	float v2 = fbm(p / 6.0);
 	float v3 = fbm(p / 400.0);
-	// los fondos de valle (mas de 500 m bajo la plaza) son mas verdes que la puna
-	vec3 hierba = mix(color_ichu, color_verde, (1.0 - smoothstep(-1200.0, -500.0, alt)) * 0.8 + v3 * 0.35);
-	hierba *= 0.85 + 0.3 * v1;
-	vec3 suelo = mix(hierba, color_tierra * (0.9 + 0.2 * v2), smoothstep(0.55, 0.8, v1 + v2 * 0.3) * 0.6);
-	vec3 roca = color_roca * (0.75 + 0.45 * v2);
 	float roca_w = smoothstep(0.18, 0.32, pend + (v1 - 0.5) * 0.12);
-	ALBEDO = mix(suelo, roca, roca_w);
+	float ichu = cobertura_ichu(p, n);
+
+	// Lejos: colores medios. Los fondos de valle (mas de 500 m bajo la plaza) son mas verdes que la puna.
+	vec3 hierba_lejos = mix(color_ichu, color_verde, (1.0 - smoothstep(-1200.0, -500.0, alt)) * 0.8 + v3 * 0.35);
+	vec3 suelo_lejos = mix(color_tierra, hierba_lejos, ichu * 0.8 + 0.2) * (0.85 + 0.3 * v1);
+	vec3 lejos = mix(suelo_lejos, color_roca * (0.8 + 0.4 * v1), roca_w);
+
+	// Cerca: texturas.
+	vec3 cerca = lejos;
+	vec3 n_det = n;
+	float detalle = 1.0 - smoothstep(60.0, 260.0, dist);
+	if (detalle > 0.0) {
+		// Cada textura se reescala para que su color medio (su mip mas pequeno) sea el color de lejos: cerca se ve el
+		// detalle de la foto, y al alejarse no hay salto de color.
+		vec3 hierba = cenital(tex_hierba, p, escala_suelo);
+		hierba *= hierba_lejos / max(textureLod(tex_hierba, vec2(0.5), 12.0).rgb, vec3(0.02));
+		vec3 tierra = cenital(tex_tierra, p, escala_suelo * 1.3);
+		tierra *= color_tierra / max(textureLod(tex_tierra, vec2(0.5), 12.0).rgb, vec3(0.02));
+		vec3 roca = triplanar(tex_roca, v_pos, n, escala_roca);
+		roca *= color_roca / max(textureLod(tex_roca, vec2(0.5), 12.0).rgb, vec3(0.02));
+		vec3 suelo = mix(tierra, hierba, smoothstep(0.2, 0.6, ichu));
+		cerca = mix(suelo, roca, roca_w) * (0.85 + 0.3 * v1);
+		// Relieve fino de la textura: perturba la normal del suelo (aproximacion "whiteout" desde arriba).
+		vec2 nh = texture(nor_hierba, p / escala_suelo).xy * 2.0 - 1.0;
+		vec2 nt = texture(nor_tierra, p / (escala_suelo * 1.3)).xy * 2.0 - 1.0;
+		vec2 nr = texture(nor_roca, p / escala_roca).xy * 2.0 - 1.0;
+		vec2 nd = mix(mix(nt, nh, smoothstep(0.2, 0.6, ichu)), nr, roca_w) * detalle;
+		n_det = normalize(vec3(n.x + nd.x, n.y, n.z - nd.y));
+	}
+	ALBEDO = mix(lejos, cerca, detalle);
+
+	// Sombras de nubes que corren con el viento: el fondo tambien se mueve.
+	float nube = smoothstep(0.52, 0.72, fbm((p - viento_dir * TIME * 9.0) / 1100.0 + 7.0));
+	ALBEDO *= 1.0 - sombra_nubes * nube;
+
+	NORMAL = (VIEW_MATRIX * vec4(n_det, 0.0)).xyz;
 	ROUGHNESS = 0.95;
 }
 """
 
+const TEXTURAS := {
+	"tex_hierba": "res://assets/terreno/withered_grass/withered_grass_diff_1k.jpg",
+	"nor_hierba": "res://assets/terreno/withered_grass/withered_grass_nor_gl_1k.jpg",
+	"tex_tierra": "res://assets/terreno/dry_ground_rocks/dry_ground_rocks_diff_1k.jpg",
+	"nor_tierra": "res://assets/terreno/dry_ground_rocks/dry_ground_rocks_nor_gl_1k.jpg",
+	"tex_roca": "res://assets/terreno/rock_face_03/rock_face_03_diff_1k.jpg",
+	"nor_roca": "res://assets/terreno/rock_face_03/rock_face_03_nor_gl_1k.jpg",
+}
+
 var lejos: Image
 var cerca: Image
+var _tex_lejos: ImageTexture
+var _tex_cerca: ImageTexture
 var _m_por_px: Vector2
 var _centro_px: Vector2
 var _paso_cerca: float
@@ -112,18 +136,16 @@ func _ready() -> void:
 	_centro_px = lejos.get_meta("centro_px")
 	_paso_cerca = cerca.get_meta("paso_m")
 	_lado_cerca = (cerca.get_width() - 1) * _paso_cerca
+	_tex_lejos = ImageTexture.create_from_image(lejos)
+	_tex_cerca = ImageTexture.create_from_image(cerca)
 	var sh := Shader.new()
 	sh.code = SHADER
 	var mat := ShaderMaterial.new()
 	mat.shader = sh
-	mat.set_shader_parameter("alt_lejos", ImageTexture.create_from_image(lejos))
-	mat.set_shader_parameter("alt_cerca", ImageTexture.create_from_image(cerca))
-	mat.set_shader_parameter("m_por_px", _m_por_px)
-	mat.set_shader_parameter("centro_px", _centro_px)
-	mat.set_shader_parameter("tam_lejos", Vector2(lejos.get_width(), lejos.get_height()))
-	mat.set_shader_parameter("lado_cerca", _lado_cerca)
-	mat.set_shader_parameter("paso_cerca", _paso_cerca)
+	configurar(mat)
 	mat.set_shader_parameter("faldon", FALDON_M)
+	for t: String in TEXTURAS:
+		mat.set_shader_parameter(t, load(TEXTURAS[t]))
 	for a: Array in ANILLOS:
 		var mi := MeshInstance3D.new()
 		mi.mesh = _rejilla(a[0], a[1], a[2], a[3])
@@ -132,6 +154,24 @@ func _ready() -> void:
 		mi.custom_aabb = AABB(Vector3(-mitad, -2000.0, -mitad), Vector3(a[0], 3500.0, a[0]))
 		add_child(mi)
 	_colision()
+
+
+## Pone en `mat` los uniformes del relieve (codigo/relieve.gdshaderinc): cualquier shader que lo incluya sabe la altura
+## del suelo en cada punto (el ichu se apoya asi en el terreno sin pasar por la CPU).
+func configurar(mat: ShaderMaterial) -> void:
+	mat.set_shader_parameter("alt_lejos", _tex_lejos)
+	mat.set_shader_parameter("alt_cerca", _tex_cerca)
+	mat.set_shader_parameter("m_por_px", _m_por_px)
+	mat.set_shader_parameter("centro_px", _centro_px)
+	mat.set_shader_parameter("tam_lejos", Vector2(lejos.get_width(), lejos.get_height()))
+	mat.set_shader_parameter("lado_cerca", _lado_cerca)
+	mat.set_shader_parameter("paso_cerca", _paso_cerca)
+
+
+## Normal del suelo en x, z (la misma cuenta que el shader).
+func normal(x: float, z: float) -> Vector3:
+	var e := _paso_cerca if absf(x) < _lado_cerca * 0.5 - _paso_cerca and absf(z) < _lado_cerca * 0.5 - _paso_cerca else _m_por_px.x
+	return Vector3(altura(x - e, z) - altura(x + e, z), 2.0 * e, altura(x, z - e) - altura(x, z + e)).normalized()
 
 
 ## Altura del suelo (m, relativa a la plaza) en x, z: la misma que dibuja el shader.

@@ -14,6 +14,7 @@ const AMANECER := 6.25         # hora a la que salta Inicio (el sol asoma hacia 
 
 var cielo: Sky3D
 var terreno: Terreno
+var vegetacion: Vegetacion
 var _hora: Label
 
 
@@ -21,6 +22,10 @@ func _ready() -> void:
 	super._ready()
 	jugador.camara.far = 40000.0   # el fondo llega a ~20 km en cada direccion
 	jugador.position.y = terreno.altura(jugador.position.x, jugador.position.z) + 0.3
+	vegetacion = Vegetacion.new()
+	vegetacion.terreno = terreno
+	vegetacion.jugador = jugador
+	add_child(vegetacion)
 	cielo.sun.directional_shadow_max_distance = 600.0   # las lomas cercanas tambien dan sombra
 	_hora = Label.new()
 	_hora.position = Vector2(16, 300)
