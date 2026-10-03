@@ -44,6 +44,7 @@ func _ready() -> void:
 	add_child(jugador)
 
 	manos = Manos.new()
+	manos.cuerpo = jugador
 	jugador.camara.add_child(manos)
 	_crear_hud()
 	_cargar()
@@ -181,7 +182,7 @@ func _ctx() -> Dictionary:
 	var fwd: Vector3 = -cam.global_transform.basis.z
 	var objetivo := _apuntar()
 	return {
-		banco = self, mundo = self, camara = cam, jugador = jugador, fwd = fwd,
+		banco = self, mundo = self, camara = cam, fov = float(_actual("manos").get("fov", 90.0)), jugador = jugador, fwd = fwd,
 		origen = cam.global_position + fwd * 0.6 - cam.global_transform.basis.x * 0.2 + Vector3.DOWN * 0.2,
 		destino = objetivo + Vector3.UP * 1.1, suelo = objetivo, dummies = _dummies,
 	}

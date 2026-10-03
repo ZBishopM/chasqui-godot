@@ -26,6 +26,26 @@ var mana := 1.0         # 0..1; lo fija el juego. Con el mana vacio el oro se ap
 var _piel: ShaderMaterial
 var _crec := 0.0
 var _crec_v := 0.0
+# Salto: las manos se quedan atras al despegar y flotan en el aire (ligereza); al aterrizar se hunden con el cuerpo y suben
+# despacio, sin rebote, como al caer en tierra o pasto (peso). Un resorte sobre la altura de las manos; `cuerpo` lo asigna
+# quien monta las manos.
+const SALTO_AIRE := -0.006       # m de desplazamiento por m/s de velocidad vertical en el aire (subiendo bajan, cayendo suben)
+const SALTO_TOPE := 0.035        # m: lo maximo que flotan o se quedan atras en el aire
+const SALTO_IMPACTO := 0.3       # m/s que recibe el resorte por cada m/s de caida al tocar el suelo
+# El aterrizaje pesa segun la caida: de poca altura es corto y ligero; desde SALTO_CAIDA_MAX (la de un salto normal en
+# plano) es el mas pesado, y caer de mas alto no lo pasa.
+const SALTO_CAIDA_MAX := 5.0     # m/s
+const SALTO_SUELO_HZ := 1.6      # aterrizaje pesado: mas bajo = se hunden y suben mas despacio
+const SALTO_SUELO_AMORT := 0.8   # aterrizaje pesado: < 1 rebota (0,35 era un rebote seco), ~1 ni rebota
+const SALTO_LIGERO_HZ := 4.0     # aterrizaje de poca altura
+const SALTO_LIGERO_AMORT := 0.7
+const SALTO_CABECEO := 0.9       # rad por m: al hundirse, las munecas se inclinan hacia abajo
+var cuerpo: CharacterBody3D
+var _salto_y := 0.0
+var _salto_v := 0.0
+var _en_suelo := true
+var _vy := 0.0
+var _peso_caida := 1.0   # 0..1: cuanto pesa el ultimo aterrizaje
 
 
 func montar(e: Dictionary) -> void:
@@ -88,7 +108,7 @@ func _montar_skel(e: Dictionary) -> void:
 	else:
 		var medio := (_sk.get_bone_global_pose(_sk.find_bone(HUESOS.muneca)).origin + _sk.get_bone_global_pose(_sk.find_bone(HUESOS.muneca_der)).origin) * 0.5
 		var en_manos := global_transform.affine_inverse() * (_sk.global_transform * medio)
-		raiz.position += Vector3(0, -0.28, -0.42) - en_manos
+		raiz.position += (e.get("manos_en", Vector3(0, -0.28, -0.42)) as Vector3) - en_manos
 
 
 func _poner_material(n: Node, mat: Material) -> void:
@@ -148,6 +168,33 @@ func duracion() -> float:
 	return _dur_anim
 
 
+## En el aire: resorte blando (las manos flotan, ligeras). En el suelo: al tocarlo, el resorte recibe un golpe hacia abajo
+## proporcional a la velocidad de caida (con tope) y se vuelve mas lento cuanto mas fuerte fue la caida: de poca altura se
+## hunden poco y vuelven rapido; tras un salto normal se hunden con peso y suben despacio, sin rebotar.
+func _salto(dt: float) -> void:
+	if cuerpo == null:
+		return
+	var en_suelo := cuerpo.is_on_floor()
+	var vy := cuerpo.velocity.y
+	if en_suelo and not _en_suelo:
+		var caida := clampf(-_vy, 0.0, SALTO_CAIDA_MAX)
+		_peso_caida = caida / SALTO_CAIDA_MAX
+		_salto_v -= caida * SALTO_IMPACTO
+	_en_suelo = en_suelo
+	_vy = vy
+	var objetivo := 0.0 if en_suelo else clampf(vy * SALTO_AIRE, -SALTO_TOPE, SALTO_TOPE)
+	var frec := lerpf(SALTO_LIGERO_HZ, SALTO_SUELO_HZ, _peso_caida) if en_suelo else 2.2       # Hz
+	var amort := lerpf(SALTO_LIGERO_AMORT, SALTO_SUELO_AMORT, _peso_caida) if en_suelo else 0.8
+	var w := TAU * frec
+	# Subpasos fijos: con un frame largo (un tiron, una captura) el resorte explicito explotaria.
+	var resto := minf(dt, 0.1)
+	while resto > 0.0:
+		var h := minf(resto, 1.0 / 240.0)
+		_salto_v += (-w * w * (_salto_y - objetivo) - 2.0 * amort * w * _salto_v) * h
+		_salto_y += _salto_v * h
+		resto -= h
+
+
 func _input(ev: InputEvent) -> void:
 	if ev is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_mirada += ev.relative
@@ -163,7 +210,9 @@ func _process(dt: float) -> void:
 		_sway[i] = s[0]
 		_sway_v[i] = s[1]
 	var resp := AnimProc.respiracion(_tiempo, 0.004)
-	position = Vector3(_sway.x + resp.x, _sway.y + resp.y, 0.0)
+	_salto(dt)
+	position = Vector3(_sway.x + resp.x, _sway.y + resp.y + _salto_y, 0.0)
+	rotation.x = _salto_y * SALTO_CABECEO
 
 	if _piel != null:
 		var p := progreso()

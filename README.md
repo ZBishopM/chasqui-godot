@@ -52,15 +52,22 @@ Los gestos de los seis poderes son **clips `Animation` normales** guardados en u
 
 Para retocar un gesto: abre la escena → selecciona `Gestos` → elige el clip en el panel de animación → mueve el hueso en el Inspector (`Skeleton3D` › Bones) y pulsa la llave para insertar la clave. La demo carga la escena tal cual; no hace falta regenerar nada.
 
-Si prefieres cambiar *números* en vez de claves: edita `PICOS` (grados por movimiento) en `herramientas/generar_h4.gd`, o `GESTOS` (de qué clip se toma la pose) en `generar_h3.gd`, y vuelve a ejecutar. **Ojo: regenerar pisa las claves que hayas tocado a mano en esos clips.**
+Si prefieres cambiar *números* en vez de claves: edita `GESTOS` (de qué clip se toma la pose) en `herramientas/generar_h3.gd` y vuelve a ejecutar; H4 se regenera copiando a H3 (abajo). **Ojo: regenerar pisa las claves que hayas tocado a mano en esos clips.**
 
 ```
 godot.console.exe --headless --path . --script res://herramientas/generar_h3.gd
-godot.console.exe --headless --path . --script res://herramientas/generar_h4.gd
+godot.console.exe --headless --path . --script res://herramientas/retargetear_h4.gd
 ```
 
 - **H3:** cada clip del pack empieza y termina en su propia postura (mano abajo, pistola, guardia…), a 76–93° del `relax` que se usa de reposo; por eso volver era brusco. Los gestos nuevos salen del `relax` hacia el ápice del clip original y vuelven con curva suave, más una mezcla de 0,15 s al entrar y 0,4 s al salir (`MEZCLA_ENTRADA/SALIDA` en `manos.gd`).
-- **H4:** el rig no trae clips de gesto. `herramientas/ejes_mano.gd` calcula, de la geometría del rig, el eje con sentido de cada movimiento («el dedo se dobla hacia la palma», «el brazo sube»), así que las poses no dependen de cómo orientó sus huesos quien lo modeló.
+- **H4 copia a H3** (`herramientas/retargetear_h4.gd`): el reposo y los seis gestos, cuadro a cuadro. No copia rotaciones (los dos rigs orientan distinto sus huesos) sino direcciones en el mundo: cada hueso de H4 gira lo mínimo para apuntar adonde apunta el suyo en H3, y la mano copia además hacia dónde mira la palma. Encima, el antebrazo y la mano giran `GIRO_DORSO` (20°) sobre el eje del antebrazo para que se vea más el dorso. Encuadre: `manos_en` del catálogo = donde quedan las muñecas de H3 respecto al ojo (el script lo imprime).
+- **Trampa de H4:** su mano no cuelga del antebrazo sino de `hand.L.control`, un control de IK que Godot no resuelve; por eso sus gestos de antes se veían raros. El retarget pega la mano a la muñeca en cada cuadro. Los gestos anteriores (poses por grados, `PICOS` en `generar_h4.gd`) vuelven ejecutando `generar_h4.gd`.
+
+## Salto y aterrizaje
+
+Capa de resorte sobre la altura de las manos (`Manos._salto`): al despegar se quedan atrás, en el aire flotan, y al tocar el suelo se hunden con un golpe proporcional a la caída y suben sin rebotar, como en tierra o pasto. El peso depende de la altura: una caída corta es ligera y rápida (0,15 m: −0,6 cm, quietas en 0,16 s) y desde `SALTO_CAIDA_MAX` (5 m/s, un salto normal en plano) es la más pesada (−4 cm, quietas en ~0,45 s); caer de más alto no la pasa. Se ajusta con las constantes `SALTO_*` de `codigo/manos.gd`.
+
+La patada de FOV del Halcón (+16°) siempre vuelve al FOV de reposo del rig, aunque se pulse F seguido; el hundimiento del Sapo tampoco se acumula (`VfxPropios._tween_unico`).
 
 ## Venas de oro bajo la piel
 
