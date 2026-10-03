@@ -1,6 +1,6 @@
 extends Node3D
 ## Banco de combinaciones de Chasqui: arena greybox + jugador en primera persona.
-## Teclas: 1 manos · 2 personaje · 3 VFX · 4 estilo (Mayus = anterior) · F G R T V C poderes
+## Teclas: 1 manos · 2 personaje · 3 VFX · 4 estilo (Mayus = anterior) · F G R T V C poderes · Mayus esprintar
 ##         Tab vitrina · K guardar combinacion · F1 ocultar HUD · Esc libera el mouse
 
 const ARCHIVO := "res://combinacion.json"
@@ -23,7 +23,7 @@ void fragment() {
 }
 """
 
-var jugador: CharacterBody3D
+var jugador: Jugador
 var manos: Manos
 var sel := {"manos": 0, "personajes": 0, "vfx": 0, "estilo": 0}
 var _dummies: Array[Node3D] = []
@@ -38,8 +38,7 @@ func _ready() -> void:
 	_registrar_input()
 	_crear_entorno()
 	_crear_arena()
-	jugador = CharacterBody3D.new()
-	jugador.set_script(preload("res://codigo/jugador.gd"))
+	jugador = Jugador.new()
 	jugador.position = Vector3(0, 0.05, 2)
 	add_child(jugador)
 
@@ -101,7 +100,7 @@ func _aplicar(cat: String) -> void:
 	match cat:
 		"manos":
 			manos.montar(_actual("manos"))
-			jugador.camara.fov = float(_actual("manos").get("fov", 90.0))   # cada rig se ve bien con su FOV
+			jugador.fov_base = float(_actual("manos").get("fov", 90.0))   # cada rig se ve bien con su FOV
 			Estilo.aplicar(manos, _actual("estilo").id == "toon", _actual("manos").get("tinta", true))
 		"personajes":
 			_montar_dummies()
@@ -182,7 +181,7 @@ func _ctx() -> Dictionary:
 	var fwd: Vector3 = -cam.global_transform.basis.z
 	var objetivo := _apuntar()
 	return {
-		banco = self, mundo = self, camara = cam, fov = float(_actual("manos").get("fov", 90.0)), jugador = jugador, fwd = fwd,
+		banco = self, mundo = self, camara = cam, jugador = jugador, fwd = fwd,
 		origen = cam.global_position + fwd * 0.6 - cam.global_transform.basis.x * 0.2 + Vector3.DOWN * 0.2,
 		destino = objetivo + Vector3.UP * 1.1, suelo = objetivo, dummies = _dummies,
 	}
@@ -258,6 +257,7 @@ func _actualizar_hud() -> void:
 	lineas.append("")
 	lineas.append("F Halcon · G Sapo · R Amaru · T Condor · V Puma · C Colibri (Mayus+C ralentiza)")
 	lineas.append("O ofrenda (Loot VFX, rareza cicla) · Mayus+1..4 anterior · Tab vitrina · K guardar · F1 ocultar · Esc mouse")
+	lineas.append("WASD andar · Mayus esprintar · Espacio saltar")
 	_hud.text = "\n".join(lineas)
 
 
@@ -461,7 +461,7 @@ func _cargar() -> void:
 func _registrar_input() -> void:
 	var teclas := {
 		"adelante": KEY_W, "atras": KEY_S, "izquierda": KEY_A, "derecha": KEY_D,
-		"saltar": KEY_SPACE, "liberar_mouse": KEY_ESCAPE,
+		"saltar": KEY_SPACE, "liberar_mouse": KEY_ESCAPE, "esprintar": KEY_SHIFT,
 	}
 	for nombre: String in teclas:
 		if not InputMap.has_action(nombre):

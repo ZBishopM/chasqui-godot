@@ -1,9 +1,11 @@
 class_name CapasManos
 extends SkeletonModifier3D
 ## Capas procedurales encima de la animacion de las manos. Corre despues del AnimationPlayer (`Gestos`), asi que suma
-## movimiento sin tocar los clips. Tics de reposo: de vez en cuando una mano tamborilea, se estira, aprieta, frota el
-## pulgar o gira la muneca, para que las manos no parezcan congeladas.
-## Los ejes de cada movimiento salen de EjesMano en la pose de reposo, asi que valen para cualquier rig (H3 y H4).
+## movimiento sin tocar los clips.
+##  - Tics de reposo: de vez en cuando una mano tamborilea, se estira, aprieta, frota el pulgar o gira la muneca.
+##  - Al esprintar: las manos se cierran en puno y los hombros van adelante y atras alternados al ritmo del paso.
+## Los ejes de los tics salen de EjesMano en la pose de reposo, asi que valen para cualquier rig (H3 y H4). El bombeo gira
+## sobre el eje lateral de la camara.
 
 const TIC_ESPERA := Vector2(4.0, 9.0)   # s de reposo entre un tic y el siguiente (al azar en el rango)
 const TIC_FUNDIDO := 0.15                # s en que un tic se apaga si empieza un gesto o el jugador se mueve
@@ -13,8 +15,20 @@ const LADOS := [".L", ".R"]
 const GDL := ["dedos_flex", "dedos_abrir", "pulgar_flex", "muneca_flex", "muneca_abrir"]
 const DEDOS := ["f_index", "f_middle", "f_ring", "f_pinky"]
 
+const BOMBEO_GRADOS := 9.0    # hombro adelante/atras al esprintar
+const CODO_GRADOS := 6.0      # cuanto se doblan de mas los codos al esprintar
+## Puno al esprintar: la pose de la mano (palma, dedos y pulgar) se copia del puno hecho a mano en un clip de gesto, en el
+## instante en que mas cierra, y se mezcla con la animacion segun el esprint. Halcon cierra la izquierda; su derecha va
+## abierta, asi que la derecha sale de Condor (mismo pack, ~250 grados de flexion por dedo en los dos).
+const PUNO_CLIP := {".L": "halcon", ".R": "condor"}
+
+var giro_puno := 0.0     # grados que el antebrazo gira hacia pulgar arriba al esprintar (catalogo `giro_puno`)
 var en_reposo := false   # lo fija Manos: sin gesto, quieto y en el suelo
+var bombeo := 0.0        # 0..1, lo fija Manos con el esprint
+var fase_paso := 0.0     # rad, lo fija Manos: un ciclo = dos pisadas
 var tic_actual := ""
+var _brazo := {}         # lado -> [brazo, antebrazo, mano, la mano cuelga aparte (H4)]
+var _puno := {}          # lado -> hueso de la mano (palma, dedos, pulgar) -> rotacion de pose del puno
 var _ejes := {}          # lado -> gdl -> hueso -> Vector3 (eje local, largo = grados por grado del gdl)
 var _dedo_de := {}       # hueso -> indice del dedo (0 indice .. 3 menique)
 var _rng := RandomNumberGenerator.new()
@@ -24,8 +38,9 @@ var _t := 0.0
 var _peso := 1.0
 
 
-## Calcula los ejes con el esqueleto en su pose de reposo (llamar antes de anadir el modifier al esqueleto).
-func preparar(sk: Skeleton3D, yaw_grados: float) -> void:
+## Calcula los ejes con el esqueleto en su pose de reposo y toma el puno de los clips de `anim` (llamar antes de anadir el
+## modifier al esqueleto; deja `anim` en el clip `reposo`).
+func preparar(sk: Skeleton3D, yaw_grados: float, anim: AnimationPlayer, reposo: String) -> void:
 	_rng.randomize()
 	_espera = _rng.randf_range(TIC_ESPERA.x, TIC_ESPERA.y)
 	sk.force_update_all_bone_transforms()
@@ -51,6 +66,52 @@ func preparar(sk: Skeleton3D, yaw_grados: float) -> void:
 		for k in DEDOS.size():
 			for f in range(1, 4):
 				_dedo_de[sk.find_bone("%s.0%d%s" % [DEDOS[k], f, s])] = k
+		# En H4 la mano no cuelga del antebrazo sino de un control de IK: al doblar el brazo hay que llevarla a mano.
+		var antebrazo := sk.find_bone("forearm" + s)
+		var mano := sk.find_bone("hand" + s)
+		var cuelga := false
+		var padre := sk.get_bone_parent(mano)
+		while padre >= 0:
+			cuelga = cuelga or padre == antebrazo
+			padre = sk.get_bone_parent(padre)
+		_brazo[s] = [sk.find_bone("upper_arm" + s), antebrazo, mano, not cuelga]
+	if anim != null:
+		for s: String in LADOS:
+			_puno[s] = _tomar_puno(sk, anim, PUNO_CLIP[s], _brazo[s][2])
+		anim.play(reposo, 0.0)
+		anim.seek(0.0, true)
+
+
+## Rotaciones de pose de los huesos que cuelgan de `mano` en el instante del clip en que mas se alejan del reposo (para
+## un puno, cuando mas cierra). {} si el clip no existe.
+func _tomar_puno(sk: Skeleton3D, anim: AnimationPlayer, clip: String, mano: int) -> Dictionary:
+	if not anim.has_animation(clip):
+		return {}
+	var huesos: Array[int] = []
+	for i in sk.get_bone_count():
+		var p := sk.get_bone_parent(i)
+		while p >= 0 and p != mano:
+			p = sk.get_bone_parent(p)
+		if p == mano:
+			huesos.append(i)
+	var reposo := {}
+	for i in huesos:
+		reposo[i] = sk.get_bone_pose_rotation(i)
+	var largo := anim.get_animation(clip).length
+	var mejor := {}
+	var mejor_d := -1.0
+	for k in 41:
+		anim.play(clip, 0.0)   # sin mezcla: si no, cada muestra arrastraria la anterior
+		anim.seek(largo * k / 40.0, true)
+		var pose := {}
+		var d := 0.0
+		for i in huesos:
+			pose[i] = sk.get_bone_pose_rotation(i)
+			d += (pose[i] as Quaternion).angle_to(reposo[i])
+		if d > mejor_d:
+			mejor_d = d
+			mejor = pose
+	return mejor
 
 
 ## Lanza un tic ya (para probar). `nombre` = una clave de DURACION; `lado` = ".L" o ".R".
@@ -62,6 +123,9 @@ func tic(nombre: String, lado: String) -> void:
 
 
 func _process_modification_with_delta(delta: float) -> void:
+	var sk := get_skeleton()
+	if bombeo > 0.001:
+		_bombear(sk)
 	if tic_actual == "":
 		if en_reposo:
 			_espera -= delta
@@ -78,7 +142,48 @@ func _process_modification_with_delta(delta: float) -> void:
 		tic_actual = ""
 		_espera = _rng.randf_range(TIC_ESPERA.x, TIC_ESPERA.y)
 		return
-	_aplicar(get_skeleton())
+	_aplicar(sk)
+
+
+## Hombros alternos adelante/atras (sobre el eje lateral de la camara), codos mas doblados y manos en puno, por `bombeo`.
+func _bombear(sk: Skeleton3D) -> void:
+	for s: String in LADOS:
+		_cerrar_puno(sk, s, bombeo)
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return
+	var eje := (sk.global_transform.basis.orthonormalized().inverse() * cam.global_transform.basis.x).normalized()
+	for k in LADOS.size():
+		var b: Array = _brazo[LADOS[k]]
+		var antebrazo_antes := sk.get_bone_global_pose(b[1])
+		var mano_antes := sk.get_bone_global_pose(b[2])
+		if giro_puno != 0.0:
+			# Supinacion: el antebrazo gira sobre su eje hacia pulgar arriba (al reves que GIRO_DORSO de retargetear_h4).
+			var largo := (mano_antes.origin - antebrazo_antes.origin).normalized()
+			_girar(sk, b[1], Quaternion(largo, deg_to_rad(giro_puno * bombeo) * (-1.0 if k == 0 else 1.0)))
+		_girar(sk, b[0], Quaternion(eje, deg_to_rad(BOMBEO_GRADOS * bombeo * sin(fase_paso + PI * k))))
+		_girar(sk, b[1], Quaternion(eje, deg_to_rad(CODO_GRADOS * bombeo)))
+		if b[3]:
+			var g := sk.get_bone_global_pose(b[1]) * antebrazo_antes.affine_inverse() * mano_antes
+			var padre := sk.get_bone_parent(b[2])
+			var local := (sk.get_bone_global_pose(padre).affine_inverse() * g) if padre >= 0 else g
+			sk.set_bone_pose_position(b[2], local.origin)
+			sk.set_bone_pose_rotation(b[2], local.basis.get_rotation_quaternion())
+
+
+## Mezcla la mano `s` hacia su puno con peso `w` (0 = como venga de la animacion, 1 = el puno del clip).
+func _cerrar_puno(sk: Skeleton3D, s: String, w: float) -> void:
+	var puno: Dictionary = _puno.get(s, {})
+	for hueso: int in puno:
+		sk.set_bone_pose_rotation(hueso, sk.get_bone_pose_rotation(hueso).slerp(puno[hueso], w))
+
+
+## Gira el hueso `i` con `q` en el espacio del esqueleto, sobre su propio origen.
+func _girar(sk: Skeleton3D, i: int, q: Quaternion) -> void:
+	var nueva := Basis(q) * sk.get_bone_global_pose(i).basis
+	var padre := sk.get_bone_parent(i)
+	var local := (sk.get_bone_global_pose(padre).basis.inverse() * nueva) if padre >= 0 else nueva
+	sk.set_bone_pose_rotation(i, local.get_rotation_quaternion())
 
 
 func _aplicar(sk: Skeleton3D) -> void:

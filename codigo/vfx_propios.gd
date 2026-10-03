@@ -1,7 +1,7 @@
 class_name VfxPropios
 extends RefCounted
 ## V1: efectos propios de los 6 poderes del GDD §10, con GPUParticles3D + shaders. Sin texturas externas.
-## ctx = {banco, mundo, camara, fov, jugador, fwd, origen, destino, suelo, dummies}   (fov = el de reposo de la camara)
+## ctx = {banco, mundo, camara, jugador, fwd, origen, destino, suelo, dummies}
 ##   origen = mano izquierda · destino = pecho del objetivo · suelo = sus pies.
 ## Todo lo que nace aqui entra al grupo "vfx" para que el Colibri pueda congelarlo.
 
@@ -71,11 +71,11 @@ static func _halcon_mecanica(ctx: Dictionary) -> void:
 	var fwd: Vector3 = ctx.fwd
 	jug.velocity.y = 6.0                                   # fase 1: despegue vertical
 	jug.impulso = Vector3(fwd.x, 0, fwd.z).normalized() * 18.0   # fase 2: picado hacia delante
-	# La base es el FOV de reposo, no el actual: con F seguido el actual ya viene subido y la patada se acumulaba (llego a
-	# 176 grados).
-	var tw := _tween_unico(ctx.mundo, ctx.camara, "patada_fov")
-	tw.tween_property(ctx.camara, "fov", ctx.fov + 16.0, 0.12)
-	tw.tween_property(ctx.camara, "fov", ctx.fov, 0.5).set_trans(Tween.TRANS_SINE)
+	# La patada es un sumando del FOV que el jugador compone con el de reposo y el del esprint; va a valores fijos (16 y 0)
+	# para que con F seguido no se acumule (antes partia del FOV actual y llego a 176 grados).
+	var tw := _tween_unico(ctx.mundo, ctx.jugador, "patada_fov")
+	tw.tween_property(ctx.jugador, "patada_fov", 16.0, 0.12)
+	tw.tween_property(ctx.jugador, "patada_fov", 0.0, 0.5).set_trans(Tween.TRANS_SINE)
 
 
 ## Tween que corta al anterior con la misma `clave` sobre `n`: repetir un poder no apila dos tweens peleando por lo mismo.

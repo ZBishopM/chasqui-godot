@@ -12,6 +12,7 @@ const MANOS := [
 		url="https://opengameart.org/content/fps-arms-rigged-only", rutas=["res://assets/manos/oga_fps_arms/arms_anim.fbx"],
 		textura="res://assets/manos/oga_fps_arms/new_diff.png", escena="res://escenas/manos_h4.tscn", piel="res://escenas/piel_h4.res", escala=0.1, yaw=180.0, tinta=false,
 		manos_en=Vector3(0, -0.099, -0.266), fov=70.0,   # gestos copiados de H3 (retargetear_h4.gd): mismo encuadre que H3
+		giro_puno=25.0,   # al esprintar deshace el giro del dorso (GIRO_DORSO) y gira los punos como los de H3
 		anim_reposo="reposo", gestos_anim={halcon="halcon", sapo="sapo", amaru="amaru", condor="condor", puma="puma", colibri="colibri"}},
 ]
 

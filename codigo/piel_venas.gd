@@ -30,6 +30,9 @@ uniform float luz = 1.6;               // energia del oro encendido
 uniform float luz_reposo = 0.08;       // fraccion de luz que conserva el oro en reposo
 uniform float latido = 0.12;           // cuanto late la vena (altura) con el pulso
 uniform float rugosidad = 0.62;
+// FOV propio de las manos (viewmodel FOV), en grados verticales; 0 = el de la camara. Asi el FOV del mundo puede abrirse
+// (esprint, patada del Halcon) sin que los antebrazos, tan cerca de la camara, se estiren hacia los bordes.
+uniform float fov_manos = 0.0;
 
 varying float v_campo;   // distancia al eje / alcance del bulto (1 = fin del bulto)
 varying float v_r;       // distancia al eje de la vena / (3 * semiancho): 1 = lejos de toda vena
@@ -70,6 +73,14 @@ void vertex() {
 	v_h = h;
 	v_ancho = 2.0 * UV2.x * unidad * ancho;
 	v_aleja = normalize((MODELVIEW_MATRIX * vec4(TANGENT, 0.0)).xyz);
+	// Solo en perspectiva (la camara): las sombras del sol se dibujan en ortografica y no se tocan.
+	if (fov_manos > 0.0 && PROJECTION_MATRIX[3][3] < 0.5) {
+		// Solo cambia la escala; el signo se conserva (Godot invierte la Y en la proyeccion).
+		float f = 1.0 / tan(radians(fov_manos) * 0.5);
+		float aspecto = abs(PROJECTION_MATRIX[1][1] / PROJECTION_MATRIX[0][0]);
+		PROJECTION_MATRIX[1][1] = f * sign(PROJECTION_MATRIX[1][1]);
+		PROJECTION_MATRIX[0][0] = f / aspecto * sign(PROJECTION_MATRIX[0][0]);
+	}
 }
 
 void fragment() {

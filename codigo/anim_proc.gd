@@ -61,6 +61,12 @@ static func espasmo(t: float, semilla: float = 0.0) -> float:
 	return env * (sin(t * 90.0 + semilla * 5.0) * 0.6 + sin(t * 151.0 + semilla * 3.0 + 1.0) * 0.4)
 
 
+## Balanceo al andar como un ocho (Lissajous 1:2): un vaiven lateral por cada dos pisadas y un rebote vertical por pisada,
+## como la cabeza al andar (bobLissajous de la version web).
+static func bob_lissajous(fase: float, amplitud: float) -> Vector2:
+	return Vector2(sin(fase) * amplitud, sin(fase * 2.0) * amplitud * 0.6)
+
+
 static func respiracion(t: float, amplitud: float = 1.0) -> Vector2:
 	var y := (sin(t * 1.6) * 0.7 + sin(t * 0.9 + 1.3) * 0.3) * amplitud
 	var x := sin(t * 1.1 + 0.5) * amplitud

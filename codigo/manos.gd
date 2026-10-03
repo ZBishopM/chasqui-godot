@@ -42,7 +42,18 @@ const SALTO_SUELO_AMORT := 0.8   # aterrizaje pesado: < 1 rebota (0,35 era un re
 const SALTO_LIGERO_HZ := 4.0     # aterrizaje de poca altura
 const SALTO_LIGERO_AMORT := 0.7
 const SALTO_CABECEO := 0.9       # rad por m: al hundirse, las munecas se inclinan hacia abajo
-var cuerpo: CharacterBody3D
+# Paso: balanceo en ocho al andar, mas amplio al esprintar; al esprintar ademas los brazos bombean (CapasManos).
+const PASO_LARGO := Vector2(1.6, 2.0)     # m por pisada andando / esprintando (fija la cadencia)
+const BOB := Vector2(0.006, 0.014)        # m de amplitud del ocho andando / esprintando
+const BOB_ALABEO := 2.0                   # rad de alabeo por m de vaiven lateral
+const ESPRINT_CABECEO := 0.06             # rad: al esprintar las manos se inclinan hacia delante
+const ESPRINT_BAJAR := 0.035              # m que bajan las manos al esprintar
+var cuerpo: Jugador
+var _fase_paso := 0.0
+var _amp_paso := 0.0
+var _amp_paso_v := 0.0
+var _bombeo := 0.0
+var _bombeo_v := 0.0
 var _salto_y := 0.0
 var _salto_v := 0.0
 var _en_suelo := true
@@ -84,6 +95,7 @@ func _montar_skel(e: Dictionary) -> void:
 				m.set_meta("malla_original", m.mesh)
 				m.mesh = densa
 				_piel = PielVenas.material(antes.albedo_texture, float(densa.get_meta("m_por_u", 1.0)))
+				_piel.set_shader_parameter("fov_manos", float(e.get("fov", 0.0)))   # el esprint abre el mundo, no las manos
 				m.material_override = _piel
 	# Escena editable (`Gestos` = AnimationPlayer con los clips del catalogo): se usa ella sola; el AnimationPlayer del
 	# modelo importado se apaga para que dos reproductores no se pisen los huesos.
@@ -104,7 +116,9 @@ func _montar_skel(e: Dictionary) -> void:
 		_anim.advance(0.0)
 	_sk = _buscar(raiz, "Skeleton3D") as Skeleton3D
 	_capas = CapasManos.new()
-	_capas.preparar(_sk, float(e.get("yaw", 180.0)))   # con el esqueleto en el reposo que acaba de poner el AnimationPlayer
+	# Con el esqueleto en el reposo que acaba de poner el AnimationPlayer; toma tambien el puno de los clips de gesto.
+	_capas.preparar(_sk, float(e.get("yaw", 180.0)), _anim, _anim_reposo)
+	_capas.giro_puno = float(e.get("giro_puno", 0.0))
 	_sk.add_child(_capas)
 	var cam_i := _sk.find_bone(HUESOS.ojo)
 	if cam_i >= 0:
@@ -201,6 +215,31 @@ func _salto(dt: float) -> void:
 		resto -= h
 
 
+## Fase y amplitud del paso; devuelve el balanceo en ocho de este frame. La fase avanza con la distancia recorrida en el
+## suelo (asi la cadencia sigue a la velocidad) y la amplitud persigue la de andar o esprintar con un resorte. Al esprintar
+## sin gesto en curso, los brazos bombean al ritmo de la misma fase.
+func _paso(dt: float, p: float) -> Vector2:
+	var vel := 0.0
+	var esprint := 0.0
+	if cuerpo != null:
+		esprint = cuerpo.esprint
+		if cuerpo.is_on_floor():
+			vel = Vector2(cuerpo.velocity.x, cuerpo.velocity.z).length()
+	var largo := lerpf(PASO_LARGO.x, PASO_LARGO.y, esprint)
+	_fase_paso = fmod(_fase_paso + vel * dt / (2.0 * largo) * TAU, TAU)
+	var meta := lerpf(BOB.x, BOB.y, esprint) * clampf(vel / Jugador.VELOCIDAD, 0.0, 1.0)
+	var s := AnimProc.resorte(_amp_paso, _amp_paso_v, meta, 0.1, dt)
+	_amp_paso = maxf(s[0], 0.0)
+	_amp_paso_v = s[1]
+	var b := AnimProc.resorte(_bombeo, _bombeo_v, esprint if p < 0.0 and vel > 0.5 else 0.0, 0.1, dt)
+	_bombeo = clampf(b[0], 0.0, 1.0)
+	_bombeo_v = b[1]
+	if _capas != null:
+		_capas.bombeo = _bombeo
+		_capas.fase_paso = _fase_paso
+	return AnimProc.bob_lissajous(_fase_paso, _amp_paso)
+
+
 func _input(ev: InputEvent) -> void:
 	if ev is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_mirada += ev.relative
@@ -217,10 +256,13 @@ func _process(dt: float) -> void:
 		_sway_v[i] = s[1]
 	var resp := AnimProc.respiracion(_tiempo, 0.004)
 	_salto(dt)
-	position = Vector3(_sway.x + resp.x, _sway.y + resp.y + _salto_y, 0.0)
-	rotation.x = _salto_y * SALTO_CABECEO
-
 	var p := progreso()
+	var bob := _paso(dt, p)
+	var esprint := cuerpo.esprint if cuerpo != null else 0.0
+	position = Vector3(_sway.x + resp.x + bob.x, _sway.y + resp.y + _salto_y + bob.y - ESPRINT_BAJAR * esprint, 0.0)
+	rotation.x = _salto_y * SALTO_CABECEO - ESPRINT_CABECEO * esprint
+	rotation.z = -bob.x * BOB_ALABEO
+
 	if _capas != null:
 		var quieto := cuerpo == null or (cuerpo.is_on_floor() and Vector2(cuerpo.velocity.x, cuerpo.velocity.z).length() < 0.3)
 		_capas.en_reposo = p < 0.0 and quieto
