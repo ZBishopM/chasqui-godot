@@ -11,14 +11,15 @@ const R1 := 38500.0          # m: borde de fuera (cerca del far de la camara)
 const ANGULOS := 360
 const RADIOS := 28
 const ACIMUT_SOL := 65.8     # los nevados mas altos, detras de la salida del sol
+const ACIMUT_PUESTA := 293.0 # brecha: ahi se pone el sol del 21 de junio, en el abra del relieve (ABRAS de hornear_relieve)
 
 const SHADER := """
 shader_type spatial;
 render_mode cull_disabled;
 uniform vec3 color_roca : source_color = vec3(0.42, 0.38, 0.34);
 uniform vec3 color_puna : source_color = vec3(0.55, 0.48, 0.33);
-uniform vec3 color_nieve : source_color = vec3(0.93, 0.95, 1.0);
-uniform float cota_nieve = 2150.0;   // m sobre la plaza (3482 m): la nieve empieza hacia los 5600 m (solo las cumbres)
+uniform vec3 color_nieve : source_color = vec3(0.84, 0.87, 0.93);
+uniform float cota_nieve = 3100.0;   // m sobre la plaza (con el relieve exagerado): solo las cumbres mas altas
 varying vec3 v_pos;
 varying vec3 v_nor;
 
@@ -36,7 +37,9 @@ void vertex() {
 void fragment() {
 	float pend = 1.0 - v_nor.y;
 	float vetas = azar(floor(v_pos.xz / 180.0)) * 300.0;
-	float nieve = smoothstep(cota_nieve - 250.0 + vetas, cota_nieve + 250.0 + vetas, v_pos.y) * (1.0 - smoothstep(0.45, 0.7, pend));
+	// En las caras empinadas la nieve no agarra: vetas de roca oscura entre las canaletas blancas (como el Salkantay).
+	float canal = (azar(floor(v_pos.xz / 70.0)) - 0.5) * 0.3;
+	float nieve = smoothstep(cota_nieve - 250.0 + vetas, cota_nieve + 250.0 + vetas, v_pos.y) * (1.0 - smoothstep(0.28, 0.5, pend + canal));
 	vec3 base = mix(color_puna, color_roca, smoothstep(0.15, 0.4, pend) + smoothstep(600.0, 1400.0, v_pos.y) * 0.6);
 	ALBEDO = mix(base, color_nieve, nieve);
 	ROUGHNESS = mix(0.95, 0.5, nieve);
@@ -67,13 +70,16 @@ func _ready() -> void:
 			var env := smoothstep(0.0, 0.35, f) * (1.0 - 0.35 * smoothstep(0.75, 1.0, f))
 			# Crestas desiguales: la mayoria se queda en puna y roca; solo algunas pasan la cota de nieve.
 			var cresta := pow(ruido.get_noise_2d(p.x, p.y) * 0.5 + 0.5, 1.7)
-			var alto := -900.0 + env * (900.0 + 900.0 + 2900.0 * cresta)
+			var alto := -1800.0 + env * (1800.0 + 1600.0 + 4300.0 * cresta)   # por encima del relieve quebrado (hasta ~2800 m)
 			# Mas altos detras del amanecer (ENE) y hacia el norte.
 			var hacia_sol := cos(a - deg_to_rad(ACIMUT_SOL))
-			alto += env * 700.0 * maxf(hacia_sol, 0.0)
+			alto += env * 1000.0 * maxf(hacia_sol, 0.0)
 			# Delante, algunos panes de azucar (Huayna Picchu): conos empinados donde el ruido de picos es alto.
 			var pan := smoothstep(0.55, 0.85, picos.get_noise_2d(p.x, p.y) * 0.5 + 0.5) * (1.0 - smoothstep(0.1, 0.3, f)) * smoothstep(0.0, 0.08, f)
-			alto += pan * 1300.0
+			alto += pan * 1900.0
+			# Brecha hacia la puesta: sin ella los picos (a ~10 grados) esconden el sol antes de que llegue al abra.
+			var brecha := exp(-pow(angle_difference(a, deg_to_rad(ACIMUT_PUESTA)) / deg_to_rad(7.0), 2.0))
+			alto = lerpf(alto, -1800.0 + (alto + 1800.0) * 0.18, brecha)
 			alturas.append(alto)
 			pos.append(Vector3(p.x, alto, p.y))
 	var st := SurfaceTool.new()
@@ -101,4 +107,4 @@ func _ready() -> void:
 	mat.shader = sh
 	material_override = mat
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	custom_aabb = AABB(Vector3(-R1, -2000.0, -R1), Vector3(R1 * 2.0, 8000.0, R1 * 2.0))
+	custom_aabb = AABB(Vector3(-R1, -3000.0, -R1), Vector3(R1 * 2.0, 13000.0, R1 * 2.0))

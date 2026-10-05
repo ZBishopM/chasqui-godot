@@ -474,6 +474,8 @@ func _miradores_generales() -> void:
 	_mirador("callejon", Vector3(-48, hc + 1.6, 45), Vector3(-48, hc + 1.0, -80))
 	var hv := _altura(70, 75)
 	_mirador("vista", Vector3(70, hv + 45.0, 75), Vector3(-50, 0, -20))
+	# Al cielo del oeste desde la plaza (unos 24 grados arriba): para ver las nubes.
+	_mirador("nubes", Vector3(0, h0 + 1.6, 12), Vector3(-200, h0 + 96.0, -50))
 
 
 # --- Suelo de obra --------------------------------------------------------------------------------

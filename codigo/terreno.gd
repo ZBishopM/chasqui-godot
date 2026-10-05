@@ -36,7 +36,11 @@ uniform vec3 color_ichu : source_color = vec3(0.58, 0.49, 0.31);
 uniform vec3 color_verde : source_color = vec3(0.33, 0.38, 0.22);
 uniform vec3 color_tierra : source_color = vec3(0.46, 0.37, 0.27);
 uniform vec3 color_roca : source_color = vec3(0.43, 0.40, 0.36);
-uniform float sombra_nubes = 0.35;  // cuanto oscurecen las sombras de las nubes que corren con el viento
+uniform float sombra_nubes = 0.5;   // cuanto oscurecen las sombras de las nubes que corren con el viento
+// Chacras en los fondos de valle (de lejos): parcelas de verdes y ocres con pircas oscuras en los bordes y algun arbol.
+uniform vec3 chacra_verde : source_color = vec3(0.30, 0.42, 0.16);
+uniform vec3 chacra_ocre : source_color = vec3(0.58, 0.50, 0.26);
+uniform vec3 color_pirca : source_color = vec3(0.16, 0.14, 0.12);
 // Huecos (boca del pozo, entrada de la cueva): (x, z, radio). Ahi el suelo no se dibuja; la pieza que va dentro tapa el borde.
 uniform vec3 huecos[16];
 uniform int n_huecos = 0;
@@ -85,6 +89,22 @@ void fragment() {
 	vec3 hierba_lejos = mix(color_ichu, color_verde, (1.0 - smoothstep(-1200.0, -500.0, alt)) * 0.8 + v3 * 0.35);
 	vec3 suelo_lejos = mix(color_tierra, hierba_lejos, ichu * 0.8 + 0.2) * (0.85 + 0.3 * v1);
 	vec3 lejos = mix(suelo_lejos, color_roca * (0.8 + 0.4 * v1), roca_w);
+	// Chacras: en lo llano del fondo de los valles, parcelas giradas de 40-80 m, de verde a ocre, con la pirca del borde
+	// (se ensancha con la distancia para no parpadear) y arboles sueltos junto a ella.
+	float en_valle = (1.0 - smoothstep(-650.0, -420.0, alt)) * (1.0 - smoothstep(0.05, 0.12, pend)) * smoothstep(250.0, 600.0, dist);
+	if (en_valle > 0.0) {
+		vec2 q = mat2(vec2(0.82, 0.57), vec2(-0.57, 0.82)) * p / vec2(62.0, 44.0);
+		vec2 celda = floor(q);
+		vec2 f = fract(q);
+		float tono = azar(celda);
+		vec3 parcela = mix(chacra_verde, chacra_ocre, smoothstep(0.55, 0.9, tono)) * (0.8 + 0.35 * azar(celda + 7.1));
+		float ancho_pirca = clamp(dist / 9000.0, 0.012, 0.06);
+		float borde = min(min(f.x, 1.0 - f.x) * 62.0 / 44.0, min(f.y, 1.0 - f.y));
+		float pirca = 1.0 - smoothstep(ancho_pirca, ancho_pirca * 2.0, borde);
+		float arbol = step(0.78, azar(floor(p / 9.0))) * (1.0 - smoothstep(0.0, 0.12, borde));
+		parcela = mix(parcela, color_pirca, max(pirca * 0.85, arbol * 0.7));
+		lejos = mix(lejos, parcela, en_valle);
+	}
 
 	// Cerca: texturas.
 	vec3 cerca = lejos;
@@ -111,7 +131,7 @@ void fragment() {
 	ALBEDO = mix(lejos, cerca, detalle);
 
 	// Sombras de nubes que corren con el viento: el fondo tambien se mueve.
-	float nube = smoothstep(0.52, 0.72, fbm((p - viento_dir * TIME * 9.0) / 1100.0 + 7.0));
+	float nube = smoothstep(0.5, 0.7, fbm((p - viento_dir * TIME * 9.0) / 1800.0 + 7.0));   // nubes grandes
 	ALBEDO *= 1.0 - sombra_nubes * nube;
 
 	// Lluvia: el suelo mojado es mas oscuro y brillante; en lo llano se forman charcos que reflejan el cielo.
