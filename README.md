@@ -81,6 +81,31 @@ Capa de resorte sobre la altura de las manos (`Manos._salto`): al despegar se qu
 
 `CapasManos` es un `SkeletonModifier3D`: corre después del `AnimationPlayer` y suma todo esto encima de los clips, sin tocarlos.
 
+## Parkour (N4)
+
+`Jugador` busca cornisas en el aire mirando a un muro: un rayo al pecho encuentra la cara y otro desde arriba encuentra el borde.
+
+- **Bordes bajos:** si el borde queda por debajo del pecho, sube de una vez.
+- **Bordes altos:** si queda más arriba, se cuelga y las manos suben a agarrarlo (`Jugador.colgado` → `Manos`).
+- **Colgado:** A/D se desplaza por la cornisa (1,4 m/s, se para donde acaba el borde); W o Espacio sube a pulso (agachado si arriba no cabe de pie); Ctrl o S se suelta; S + Espacio salta hacia atrás.
+- **Saltos:** tiempo de coyote y salto anticipado de 0,12 s.
+
+Medido con `herramientas/probar_parkour.gd` (headless):
+
+| Muro | Resultado |
+|---|---|
+| 0,8 m | se salta por encima |
+| 1,2 m | se sube de un salto |
+| 1,5–2,3 m (cercos) | sube sin colgarse |
+| 2,5–3,5 m | se cuelga y sube a pulso |
+| 3,8 m o más | no llega |
+
+Los huecos entre tejados se saltan esprintando hasta 8 m (aterriza a 0,3 m del borde). Constantes: `AGARRE_ALTO`, `SIN_COLGARSE`, `LATERAL`, `SUBIR_SEG`, `COYOTE`, `ANTICIPO` en `jugador.gd`.
+
+```
+godot.console.exe --headless --path . --script res://herramientas/probar_parkour.gd
+```
+
 ## Sombra del jugador
 
 Los brazos en primera persona no dan sombra. La da `CuerpoSombra`: el maniquí de Quaternius (UAL), invisible para la cámara (`SHADOWS_ONLY`), colgado del jugador. Anima reposo, trote, esprint, agachado y salto según el estado del jugador, y sus brazos apuntan adonde apuntan los brazos en primera persona (`BrazosSombra`). No copia los puños ni el bombeo del esprint.

@@ -50,7 +50,7 @@ Cada hito termina en PARADA, con capturas y números. No se sigue hasta el «sig
 | N1 | Relieve real, fondo en capas con niebla. | Hecho (`6e79cdd`). Pendiente: relieve más accidentado (pedido para después). |
 | N2 | Vida en el suelo: ichu con viento, flores, arbustos, árboles y piedras. | Hecho (`41c5827`) |
 | N3 | Zona 1, el pueblo: kit modular inca, kanchas, kallankas, colcas, plazas, escondrijos, pozos, tejados por donde correr, sótano secreto. | **Hecho en la rama `claude/modest-brahmagupta-bjqbe0`; PARADA pendiente** (probar en local) |
-| N4 | Parkour: agarrarse a cornisas, subir a pulso, saltar entre tejados, trepar. PARADA: tiras de cuadros y alturas medidas. | — |
+| N4 | Parkour: agarrarse a cornisas, subir a pulso, saltar entre tejados, trepar. PARADA: alturas medidas. | Hecho: `herramientas/probar_parkour.gd` (bordes de 1,2 a 3,5 m, huecos de hasta 8 m) |
 | N5 | Zona 2, el Qhapaq Ñan al templo: camino largo y laberíntico entre andenes y quebradas, el pozo, atajos y una cueva. | — |
 | N6 | Zona 3, el Templo del Sol: plataformas escalonadas, ushnu y portada de doble jamba, con vista al amanecer. | — |
 | N7 | Cierre: regresión, rendimiento, README y memoria. | — |

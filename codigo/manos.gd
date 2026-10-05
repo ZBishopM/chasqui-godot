@@ -76,6 +76,10 @@ var _peso_caida := 1.0   # 0..1: cuanto pesa el ultimo aterrizaje
 # Al agacharse la cabeza baja de golpe y las manos se quedan un instante arriba (al levantarse, abajo); el mismo resorte.
 const AGACHAR_GOLPE := 0.45      # m/s que recibe el resorte al agacharse o levantarse
 var _agachado := false
+# Colgado de una cornisa (Jugador.colgado): las manos suben al borde.
+const COLGADO_SUBIR := 0.24      # m
+const COLGADO_ADELANTE := 0.08   # m
+const COLGADO_CABECEO := 0.75    # rad: las munecas se giran hacia arriba
 
 
 func montar(e: Dictionary) -> void:
@@ -336,6 +340,10 @@ func _process(dt: float) -> void:
 	var esprint := cuerpo.esprint if cuerpo != null else 0.0
 	position = Vector3(_sway.x + resp.x + bob.x, _sway.y + resp.y + _salto_y + bob.y - ESPRINT_BAJAR * esprint, 0.0)
 	rotation.x = _salto_y * SALTO_CABECEO - ESPRINT_CABECEO * esprint
+	# Colgado de una cornisa (parkour): las manos suben y se adelantan a agarrar el borde.
+	var colg := cuerpo.colgado if cuerpo != null else 0.0
+	position += Vector3(0.0, COLGADO_SUBIR, -COLGADO_ADELANTE) * colg
+	rotation.x += COLGADO_CABECEO * colg
 	rotation.z = -bob.x * BOB_ALABEO
 
 	if _capas != null:
