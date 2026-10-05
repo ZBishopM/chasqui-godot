@@ -51,6 +51,7 @@ func _ready() -> void:
 	miradores.append_array(hogar.miradores)
 	miradores.append_array(camino.miradores)
 	miradores.append_array(templo.miradores)
+	_miradores_cordillera()
 	vegetacion = Vegetacion.new()
 	vegetacion.terreno = terreno
 	vegetacion.jugador = jugador
@@ -87,7 +88,7 @@ func _crear_entorno() -> void:
 	# Niebla para un valle andino seco de ~40 km (la de Sky3D viene para 1 km). Su "nivel del mar" corta los rayos que
 	# bajan de y = 0 (la plaza) y dibujaba una raya recta en el horizonte: se baja por debajo de todo el relieve.
 	cielo.sky.fog_sea_level = -4800.0   # bajo los valles mas hondos del relieve quebrado (~ -4000 m)
-	cielo.sky.fog_density = 0.00006
+	cielo.sky.fog_density = 0.000032   # mas espesa blanqueaba la cordillera (a 20-38 km quedaba color crema)
 	cielo.sky.fog_end = 30000.0
 	cielo.sky.fog_falloff = 1.0
 	# Nubes grandes y cercanas, de vientre gris (como las de la costa y los valles en la tarde): cumulos mas grandes
@@ -143,6 +144,24 @@ func _unhandled_input(ev: InputEvent) -> void:
 			var n := miradores.size()
 			_mirador = (_mirador + (-1 if (ev as InputEventKey).shift_pressed else 1) + n) % n
 			_ir_a_mirador(_mirador)
+
+
+## Miradores hacia los nevados (Cordillera.MACIZOS): desde lo alto del templo hacia Vilcabamba (ENE), con luz de tarde
+## en sus caras oeste, y hacia los volcanes del sur (Ccarhuarazo, Solimana) desde lo alto del pueblo.
+func _miradores_cordillera() -> void:
+	var cima := Vector3.ZERO
+	for m: Dictionary in templo.miradores:
+		if m.nombre == "amanecer":
+			cima = m.pos
+	var hacia := func(acimut: float, elev: float) -> Vector3:
+		var a := deg_to_rad(acimut)
+		return cima + Vector3(sin(a), tan(deg_to_rad(elev)), -cos(a)) * 1000.0
+	miradores.append({"nombre": "nevados", "pos": cima, "mira": hacia.call(73.0, 6.0), "hora": 15.0})
+	# Los volcanes del sur, desde el mirador alto del pueblo ("vista"), que no tiene muros delante.
+	for m: Dictionary in pueblo.miradores:
+		if m.nombre == "vista":
+			var a := deg_to_rad(160.0)
+			miradores.append({"nombre": "volcanes", "pos": m.pos, "mira": (m.pos as Vector3) + Vector3(sin(a), tan(deg_to_rad(3.0)), -cos(a)) * 1000.0, "hora": 11.0})
 
 
 ## Lleva al jugador al mirador i del pueblo, mirando hacia donde dice.

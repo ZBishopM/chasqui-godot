@@ -20,6 +20,7 @@ shader_type spatial;
 render_mode cull_disabled;   // los faldones se ven por las dos caras
 
 #include "res://codigo/relieve.gdshaderinc"
+#include "res://codigo/biomas_andinos.gdshaderinc"
 
 uniform float faldon = 30.0;
 // Texturas de suelo (Poly Haven, CC0): hierba seca, tierra con piedras y roca. Se ven de cerca; lejos se funden con
@@ -89,6 +90,16 @@ void fragment() {
 	vec3 hierba_lejos = mix(color_ichu, color_verde, (1.0 - smoothstep(-1200.0, -500.0, alt)) * 0.8 + v3 * 0.35);
 	vec3 suelo_lejos = mix(color_tierra, hierba_lejos, ichu * 0.8 + 0.2) * (0.85 + 0.3 * v1);
 	vec3 lejos = mix(suelo_lejos, color_roca * (0.8 + 0.4 * v1), roca_w);
+	// Mas lejos, los pisos ecologicos por altitud real (biomas_andinos): valles verdes, quenuales en las quebradas,
+	// puna pajiza y superpuna de pedregal en las cumbres (el relieve real no llega a la cota de nieve).
+	float lejania = smoothstep(450.0, 1600.0, dist);
+	if (lejania > 0.0) {
+		float e = 90.0;
+		float vecinos = (altura(p + vec2(e, 0.0)) + altura(p - vec2(e, 0.0)) + altura(p + vec2(0.0, e)) + altura(p - vec2(0.0, e))) * 0.25;
+		float conc = clamp((vecinos - v_pos.y) / bio_exageracion(length(p)) / 18.0, 0.0, 1.0);
+		vec4 piso = bio_suelo(bio_msnm(v_pos), n, conc, v3, bio_ruido(p / 90.0), 0.0, bio_exageracion(length(p)));
+		lejos = mix(lejos, piso.rgb * (0.9 + 0.2 * v1), lejania);
+	}
 	// Chacras: en lo llano del fondo de los valles, parcelas giradas de 40-80 m, de verde a ocre, con la pirca del borde
 	// (se ensancha con la distancia para no parpadear) y arboles sueltos junto a ella.
 	float en_valle = (1.0 - smoothstep(-650.0, -420.0, alt)) * (1.0 - smoothstep(0.05, 0.12, pend)) * smoothstep(250.0, 600.0, dist);
@@ -140,6 +151,9 @@ void fragment() {
 	n_det = normalize(mix(n_det, n, charco));
 	NORMAL = (VIEW_MATRIX * vec4(n_det, 0.0)).xyz;
 	ROUGHNESS = mix(mix(0.95, 0.5, humedad), 0.04, charco);
+	// Seco, el suelo apenas brilla: con el especular por defecto (0,5) las laderas lejanas, vistas al sesgo, reflejaban el
+	// cielo y se veian palidas, casi blancas. Mojado y en los charcos si brilla.
+	SPECULAR = mix(mix(0.1, 0.5, humedad), 0.5, charco);
 }
 """
 
