@@ -406,8 +406,8 @@ func _process(dt: float) -> void:
 		# Las manos frente a la cara, temblando.
 		var w: float = desp[0]
 		var temblor: float = desp[3]
-		position += Vector3(temblor * 0.006, 0.11 * w + temblor * 0.004, 0.05 * w)
-		rotation.x += 0.55 * w
+		position += Vector3(temblor * 0.006, 0.035 * w + temblor * 0.004, 0.03 * w)
+		rotation.x += 0.16 * w
 	rotation.z = -bob.x * BOB_ALABEO
 
 	if _capas != null:

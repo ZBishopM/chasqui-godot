@@ -562,6 +562,22 @@ func _cueva() -> void:
 				w.y = _h(w.x, w.z)
 				q.append(w)
 			col.append_array(PackedVector3Array([q[0], q[1], q[2], q[0], q[2], q[3]]))
+	# Techo de la camara alrededor del pozo: al quitar el techo bajo el fuste queda un hueco mas ancho que el; un anillo
+	# de roca plano, a la altura del pie del fuste, lo cierra (mirando hacia abajo).
+	var y_techo: float = _info["piso_pozo"] + 3.4
+	for q in 24:
+		var a0 := TAU * q / 24.0
+		var a1 := TAU * (q + 1) / 24.0
+		var anillo_v := [Vector3(cos(a0) * 1.0, 0, sin(a0) * 1.0), Vector3(cos(a1) * 1.0, 0, sin(a1) * 1.0), Vector3(cos(a1) * 3.2, 0, sin(a1) * 3.2), Vector3(cos(a0) * 3.2, 0, sin(a0) * 3.2)]
+		var vv := []
+		for p: Vector3 in anillo_v:
+			vv.append(Vector3(POZO.x, y_techo, POZO.y) + p)
+		var orden: Array = [0, 1, 2, 0, 2, 3] if ((vv[1] as Vector3) - vv[0]).cross((vv[2] as Vector3) - vv[0]).y > 0.0 else [0, 2, 1, 0, 3, 2]
+		for o: int in orden:
+			st.set_color(Color(0.55, 0.55, 0.55))
+			st.set_normal(Vector3.DOWN)
+			st.set_uv(Vector2((vv[o] as Vector3).x, (vv[o] as Vector3).z))
+			st.add_vertex(vv[o])
 	var malla := st.commit()
 	malla.surface_set_material(0, MaterialesInca.todos()["roca"])
 	var mi := MeshInstance3D.new()
