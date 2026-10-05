@@ -6,6 +6,7 @@ extends Node3D
 ##    hierba (cobertura_ichu). Se mecen con rafagas que cruzan el campo y se apartan al paso del jugador.
 ##  - Rocas, matorrales y flores (escaneos de Poly Haven, CC0, coleccion Namaqualand: un valle seco como los de Ayacucho),
 ##    repartidos con reglas de pendiente y manchas, en MultiMesh por trozos de 150 m que se dejan de dibujar de lejos.
+## Nada crece en el suelo de obra del pueblo (Terreno.obra).
 
 ## Dos anillos de ichu que siguen al jugador: cerca matas densas de 22 hojas; mas lejos, matas de 9 hojas mas separadas
 ## (con 22 hojas en todo el campo eran 5,3 millones de triangulos). Se funden entre 18 y 25 m.
@@ -209,6 +210,8 @@ func _repartir() -> void:
 			intentos += 1
 			var x := rng.randf_range(-lado * 0.5, lado * 0.5)
 			var z := rng.randf_range(-lado * 0.5, lado * 0.5)
+			if terreno.obra(x, z) > 0.05:   # nada dentro del pueblo
+				continue
 			var n := terreno.normal(x, z)
 			var pend := 1.0 - n.y
 			var mancha := manchas.get_noise_2d(x + modelo.length() * 97.0, z) * 0.5 + 0.5

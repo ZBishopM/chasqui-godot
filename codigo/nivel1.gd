@@ -2,7 +2,8 @@ extends "res://codigo/banco.gd"
 ## Nivel 1 — Vilcashuamán (Ayacucho), prólogo Acto I: el pueblo, el camino al Templo del Sol con el pozo, y el templo.
 ## Hereda del banco las manos, los poderes, el HUD y el cambio de candidatos; cambia el entorno por un cielo con el sol y
 ## la luna donde estaban de verdad (Sky3D, latitud y fecha reales) y la arena por el escenario.
-## Teclas extra: RePág / AvPág una hora mas / menos · Inicio salto al amanecer · Fin pausa el reloj · F2 vuelve al banco.
+## Teclas extra: RePág / AvPág una hora mas / menos · Inicio salto al amanecer · Fin pausa el reloj · F2 vuelve al banco ·
+## F3 (Mayus+F3) siguiente (anterior) mirador del pueblo.
 
 const LATITUD := -13.653     # grados: Vilcashuaman
 const LONGITUD := -73.953
@@ -14,14 +15,20 @@ const AMANECER := 6.25         # hora a la que salta Inicio (el sol asoma hacia 
 
 var cielo: Sky3D
 var terreno: Terreno
+var pueblo: Pueblo
 var vegetacion: Vegetacion
 var _hora: Label
+var _mirador := -1
 
 
 func _ready() -> void:
 	super._ready()
 	jugador.camara.far = 40000.0   # el fondo llega a ~20 km en cada direccion
 	jugador.position.y = terreno.altura(jugador.position.x, jugador.position.z) + 0.3
+	# El pueblo antes que la vegetacion: marca en el terreno donde no debe crecer nada.
+	pueblo = Pueblo.new()
+	pueblo.terreno = terreno
+	add_child(pueblo)
 	vegetacion = Vegetacion.new()
 	vegetacion.terreno = terreno
 	vegetacion.jugador = jugador
@@ -88,12 +95,56 @@ func _unhandled_input(ev: InputEvent) -> void:
 			cielo.current_time = AMANECER
 		KEY_END:
 			cielo.game_time_enabled = not cielo.game_time_enabled
+		KEY_F3:
+			var n := pueblo.miradores.size()
+			_mirador = (_mirador + (-1 if (ev as InputEventKey).shift_pressed else 1) + n) % n
+			_ir_a_mirador(_mirador)
+
+
+## Lleva al jugador al mirador i del pueblo, mirando hacia donde dice.
+func _ir_a_mirador(i: int) -> void:
+	var m: Dictionary = pueblo.miradores[i]
+	var pos: Vector3 = m.pos
+	var dir: Vector3 = (m.mira as Vector3) - pos
+	jugador.global_position = pos - Vector3(0, Jugador.OJOS.x, 0)
+	jugador.velocity = Vector3.ZERO
+	jugador.rotation.y = atan2(-dir.x, -dir.z)
+	jugador.cabeza.rotation.x = atan2(dir.y, Vector2(dir.x, dir.z).length())
+	print("mirador %d/%d: %s" % [i + 1, pueblo.miradores.size(), m.nombre])
+
+
+## Recorrido del pueblo para la PARADA de N3 (lo usa el MCP via game_eval): pasa por cada mirador (o solo por los de
+## `solo`), guarda capturas/pueblo_<n>_<nombre>.png y mide FPS, primitivas y llamadas de dibujo en cada uno. Sin HUD.
+func capturar_recorrido(hora := 10.5, solo: PackedStringArray = []) -> String:
+	var hora_antes := cielo.current_time
+	var reloj := cielo.game_time_enabled
+	cielo.game_time_enabled = false
+	cielo.current_time = hora
+	_hud.visible = false
+	jugador.set_physics_process(false)
+	var lineas: PackedStringArray = []
+	for i in pueblo.miradores.size():
+		if not solo.is_empty() and not solo.has(pueblo.miradores[i].nombre):
+			continue
+		_ir_a_mirador(i)
+		await get_tree().create_timer(1.2).timeout   # que se asienten las sombras y el FPS
+		await RenderingServer.frame_post_draw
+		var ruta := _captura("pueblo_%02d_%s" % [i + 1, pueblo.miradores[i].nombre])
+		lineas.append("%-14s %4d FPS  %7d primitivas  %4d dibujos  %s" % [
+			pueblo.miradores[i].nombre, Engine.get_frames_per_second(),
+			RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME),
+			RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME), ruta])
+	jugador.set_physics_process(true)
+	_hud.visible = true
+	cielo.current_time = hora_antes
+	cielo.game_time_enabled = reloj
+	return "\n".join(lineas)
 
 
 func _process(dt: float) -> void:
 	super._process(dt)
 	if _hora != null:
 		var h := cielo.current_time
-		_hora.text = "%02d:%02d  21 jun 1532, Vilcashuaman%s   ·   RePag/AvPag hora · Inicio amanecer · Fin pausa · F2 banco" % [
+		_hora.text = "%02d:%02d  21 jun 1532, Vilcashuaman%s   ·   RePag/AvPag hora · Inicio amanecer · Fin pausa · F2 banco · F3 miradores" % [
 			int(h), int(fmod(h, 1.0) * 60.0), "" if cielo.game_time_enabled else " (pausa)"]
 		_hora.visible = _hud.visible

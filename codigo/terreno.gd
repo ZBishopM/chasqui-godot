@@ -121,8 +121,11 @@ const TEXTURAS := {
 
 var lejos: Image
 var cerca: Image
+var obras: Image                 # suelo de obra (pueblo), ver poner_obras
 var _tex_lejos: ImageTexture
 var _tex_cerca: ImageTexture
+var _tex_obras: ImageTexture
+var _mat: ShaderMaterial
 var _m_por_px: Vector2
 var _centro_px: Vector2
 var _paso_cerca: float
@@ -142,6 +145,7 @@ func _ready() -> void:
 	sh.code = SHADER
 	var mat := ShaderMaterial.new()
 	mat.shader = sh
+	_mat = mat
 	configurar(mat)
 	mat.set_shader_parameter("faldon", FALDON_M)
 	for t: String in TEXTURAS:
@@ -166,6 +170,29 @@ func configurar(mat: ShaderMaterial) -> void:
 	mat.set_shader_parameter("tam_lejos", Vector2(lejos.get_width(), lejos.get_height()))
 	mat.set_shader_parameter("lado_cerca", _lado_cerca)
 	mat.set_shader_parameter("paso_cerca", _paso_cerca)
+	if _tex_obras != null:
+		mat.set_shader_parameter("obras", _tex_obras)
+		mat.set_shader_parameter("paso_obras", _lado_cerca / (obras.get_width() - 1))
+
+
+## Marca el suelo de obra (Image FORMAT_R8 que cubre la zona jugable, 1 = obra): ahi no crece nada y el suelo es de
+## tierra. Hay que llamarlo antes de crear lo que se apoya en el terreno (Vegetacion).
+func poner_obras(img: Image) -> void:
+	obras = img
+	_tex_obras = ImageTexture.create_from_image(img)
+	configurar(_mat)
+
+
+## Cuanto suelo de obra hay en x, z (0..1).
+func obra(x: float, z: float) -> float:
+	if obras == null:
+		return 0.0
+	var paso := _lado_cerca / (obras.get_width() - 1)
+	var i := int(round((x + _lado_cerca * 0.5) / paso))
+	var j := int(round((z + _lado_cerca * 0.5) / paso))
+	if i < 0 or j < 0 or i >= obras.get_width() or j >= obras.get_height():
+		return 0.0
+	return obras.get_pixel(i, j).r
 
 
 ## Normal del suelo en x, z (la misma cuenta que el shader).

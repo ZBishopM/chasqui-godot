@@ -33,6 +33,9 @@ El editor y la demo que lanza Claude (por el MCP de Godot) **conviven**: son dos
 | `Tab` | vitrina: todos los personajes en fila |
 | `K` | guarda `combinacion.json` + una captura en `capturas/` |
 | `F1` · `Esc` | oculta el HUD · libera el mouse |
+| `F2` | banco ↔ Nivel 1 (Vilcashuamán) |
+| `RePág` / `AvPág` · `Inicio` · `Fin` | (nivel) una hora más / menos · salta al amanecer · pausa el reloj |
+| `F3` (Mayús: atrás) | (nivel) siguiente mirador del pueblo: plaza, casa, tejado, patio, kallanka, sótano… |
 
 El HUD muestra, por cada categoría, el candidato actual con su licencia y autor.
 
@@ -104,6 +107,32 @@ Volver a hornear si cambia el modelo o el trazado (`SEMILLA` en `hornear_piel.gd
 ```
 godot.console.exe --headless --path . --script res://herramientas/hornear_piel.gd
 ```
+
+## Nivel 1: Vilcashuamán (prólogo, Acto I)
+
+Plan por hitos en `docs/PLAN_NIVEL1.md` (cada hito termina en PARADA con capturas y números). `F2` abre el nivel.
+
+- **N0, cielo** (`codigo/nivel1.gd`, `addons/sky_3d`): Sky3D con la latitud, la longitud y la fecha reales (21 de junio de 1532, Inti Raymi). Un día = 20 min.
+- **N1, relieve** (`codigo/terreno.gd`, `herramientas/recortar_dem.gd`, `hornear_relieve.gd`): Copernicus GLO-30 alrededor de la plaza, en tres anillos (1,2 km a 2 m jugables, 12 km, 39 km).
+- **N2, suelo vivo** (`codigo/vegetacion.gd`): ichu procedural con viento, y flores, matorrales, árboles y rocas de Poly Haven.
+- **N3, el pueblo** (`codigo/pueblo.gd`, `codigo/kit_inca.gd`, `codigo/materiales_inca.gd`):
+  - **Traza:** cuadrícula como Ollantaytambo, girada 9°. Manzanas de dos kanchas (cercos con casas alrededor de un patio) y callejones de 4 m alrededor de una plaza de 92 × 56 m. Al norte de la plaza, dos kallankas de sillería con seis puertas.
+  - **Bordes:** al este, andenes con colcas que suben la ladera hacia el templo; al oeste, casas redondas.
+  - **Plataformas:** la meseta tiene unos 10 m de desnivel, así que cada kancha va en su propia plataforma de pirca y el pueblo baja en terrazas.
+  - **Kit:** muros con talud y vanos trapezoidales (puertas, ventanas, hornacinas), hastiales, techos de ichu a dos aguas y cónicos, colcas, pozos, escaleras (la colisión es una rampa), plataformas con trampillas, aríbalos, fardos y batanes. Todo se genera al cargar (~0,2 s): una malla por material y una sola colisión por manzana.
+  - **Materiales sin texturas nuevas:** la piedra (pirca, sillería, poligonal) y la paja se dibujan en el shader a partir de UV en metros, y la roca de Poly Haven pone el grano.
+  - **Parkour (N4 lo completa):** techos a 40° por los que se camina, coronaciones de muro de 2,3 m, pilas de fardos para subir, sarunas (piedras voladizas) en los andenes, y callejones que se saltan de techo a techo.
+  - **Escondites:** colcas en las que se entra agachado, casas oscuras, fardos, y un sótano bajo una casa del oeste. Al sótano se entra por una trampilla tapada por fardos, y se sale a gatas por el muro de la plataforma.
+  - **Suelo de obra:** `Pueblo` pinta una máscara (`Terreno.poner_obras`). Ahí no crece ichu, no se reparten plantas y el terreno pinta tierra pisada.
+
+Recorrido con capturas y números, sin el MCP (necesita ventana):
+
+```
+godot.console.exe --path . --script res://herramientas/recorrido_pueblo.gd          # 10:30
+godot.console.exe --path . --script res://herramientas/recorrido_pueblo.gd -- 17.5  # a otra hora
+```
+
+Con el MCP: `game_eval` → `await capturar_recorrido()` en la escena del nivel. Deja `capturas/pueblo_<n>_<mirador>.png` e imprime FPS, primitivas y llamadas de dibujo por mirador.
 
 ## Pruebas automáticas
 
