@@ -146,7 +146,7 @@ func _calzada(kit: KitInca) -> void:
 		var s0 := _dist[i]
 		var s1 := _dist[j]
 		if absf(dy) / largo <= ESCALERA:
-			kit.cara("poligonal", t, [_p3(i, -hw), _p3(i, hw), _p3(j, hw), _p3(j, -hw)],
+			kit.cara("losa", t, [_p3(i, -hw), _p3(i, hw), _p3(j, hw), _p3(j, -hw)],
 				[Vector2(s0, -hw), Vector2(s0, hw), Vector2(s1, hw), Vector2(s1, -hw)], _normal_losa(i, j))
 		else:
 			escalinata += largo
@@ -222,7 +222,7 @@ func _peldanos(kit: KitInca, i: int, j: int) -> void:
 		r1.y = y1
 		var sa := lerpf(sl, sh, f0)
 		var sb := lerpf(sl, sh, f1)
-		kit.cara("poligonal", t, [l0, r0, r1, l1], [Vector2(sa, -hw), Vector2(sa, hw), Vector2(sb, hw), Vector2(sb, -hw)], Vector3.UP, false)
+		kit.cara("losa", t, [l0, r0, r1, l1], [Vector2(sa, -hw), Vector2(sa, hw), Vector2(sb, hw), Vector2(sb, -hw)], Vector3.UP, false)
 		# Contrahuella: de y0 a y1 en el arranque del peldano, mirando hacia abajo de la escalera.
 		var baja := Vector3(l0.x, y0, l0.z)
 		var bajr := Vector3(r0.x, y0, r0.z)

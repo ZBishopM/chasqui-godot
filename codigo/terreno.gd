@@ -40,6 +40,7 @@ uniform float sombra_nubes = 0.35;  // cuanto oscurecen las sombras de las nubes
 // Huecos (boca del pozo, entrada de la cueva): (x, z, radio). Ahi el suelo no se dibuja; la pieza que va dentro tapa el borde.
 uniform vec3 huecos[16];
 uniform int n_huecos = 0;
+global uniform float humedad;   // 0..1: la lluvia (Lluvia) moja el suelo
 
 varying vec3 v_pos;
 varying vec3 v_normal;
@@ -113,8 +114,12 @@ void fragment() {
 	float nube = smoothstep(0.52, 0.72, fbm((p - viento_dir * TIME * 9.0) / 1100.0 + 7.0));
 	ALBEDO *= 1.0 - sombra_nubes * nube;
 
+	// Lluvia: el suelo mojado es mas oscuro y brillante; en lo llano se forman charcos que reflejan el cielo.
+	float charco = humedad * smoothstep(0.985, 0.996, n.y) * smoothstep(0.55, 0.72, fbm(p / 3.0 + 21.0)) * detalle;
+	ALBEDO *= mix(1.0, 0.62, humedad) * (1.0 - 0.45 * charco);
+	n_det = normalize(mix(n_det, n, charco));
 	NORMAL = (VIEW_MATRIX * vec4(n_det, 0.0)).xyz;
-	ROUGHNESS = 0.95;
+	ROUGHNESS = mix(mix(0.95, 0.5, humedad), 0.04, charco);
 }
 """
 

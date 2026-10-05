@@ -3,7 +3,7 @@ extends "res://codigo/banco.gd"
 ## Hereda del banco las manos, los poderes, el HUD y el cambio de candidatos; cambia el entorno por un cielo con el sol y
 ## la luna donde estaban de verdad (Sky3D, latitud y fecha reales) y la arena por el escenario.
 ## Teclas extra: RePág / AvPág una hora mas / menos · Inicio salto al amanecer · Fin pausa el reloj · F2 vuelve al banco ·
-## F3 (Mayus+F3) siguiente (anterior) mirador del pueblo.
+## F3 (Mayus+F3) siguiente (anterior) mirador · L lluvia.
 
 const LATITUD := -13.653     # grados: Vilcashuaman
 const LONGITUD := -73.953
@@ -19,6 +19,7 @@ var pueblo: Pueblo
 var camino: Camino
 var templo: Templo
 var vegetacion: Vegetacion
+var lluvia: Lluvia
 var miradores: Array[Dictionary] = []   # los de todas las zonas, en orden
 var _hora: Label
 var _mirador := -1
@@ -49,6 +50,10 @@ func _ready() -> void:
 	vegetacion.jugador = jugador
 	add_child(vegetacion)
 	cielo.sun.directional_shadow_max_distance = 600.0   # las lomas cercanas tambien dan sombra
+	lluvia = Lluvia.new()
+	lluvia.camara = jugador.camara
+	lluvia.cielo = cielo
+	add_child(lluvia)
 	_hora = Label.new()
 	_hora.position = Vector2(16, 300)
 	_hora.add_theme_font_size_override("font_size", 18)
@@ -110,6 +115,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 			cielo.current_time = AMANECER
 		KEY_END:
 			cielo.game_time_enabled = not cielo.game_time_enabled
+		KEY_L:
+			lluvia.alternar()
 		KEY_F3:
 			var n := miradores.size()
 			_mirador = (_mirador + (-1 if (ev as InputEventKey).shift_pressed else 1) + n) % n
@@ -161,6 +168,6 @@ func _process(dt: float) -> void:
 	super._process(dt)
 	if _hora != null:
 		var h := cielo.current_time
-		_hora.text = "%02d:%02d  21 jun 1532, Vilcashuaman%s   ·   RePag/AvPag hora · Inicio amanecer · Fin pausa · F2 banco · F3 miradores" % [
+		_hora.text = "%02d:%02d  21 jun 1532, Vilcashuaman%s   ·   RePag/AvPag hora · Inicio amanecer · Fin pausa · L lluvia · F2 banco · F3 miradores" % [
 			int(h), int(fmod(h, 1.0) * 60.0), "" if cielo.game_time_enabled else " (pausa)"]
 		_hora.visible = _hud.visible

@@ -5,6 +5,7 @@ extends SceneTree
 ##   godot.console.exe --path . --script res://herramientas/recorrido_pueblo.gd
 ##   godot.console.exe --path . --script res://herramientas/recorrido_pueblo.gd -- 17.5   (a otra hora)
 ##   godot.console.exe --path . --script res://herramientas/recorrido_pueblo.gd -- 10.5 casa,patio   (solo esos)
+##   godot.console.exe --path . --script res://herramientas/recorrido_pueblo.gd -- 15 patio,vista lluvia   (lloviendo)
 
 
 func _initialize() -> void:
@@ -23,5 +24,9 @@ func _correr() -> void:
 	if args.size() > 1:
 		solo = args[1].split(",")
 	var nivel := current_scene
+	if args.size() > 2 and args[2] == "lluvia":
+		nivel.lluvia.poner(1.0)
+		for i in 30:
+			await process_frame
 	print(await nivel.capturar_recorrido(hora, solo))
 	quit()

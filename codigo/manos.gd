@@ -76,6 +76,11 @@ var _peso_caida := 1.0   # 0..1: cuanto pesa el ultimo aterrizaje
 # Al agacharse la cabeza baja de golpe y las manos se quedan un instante arriba (al levantarse, abajo); el mismo resorte.
 const AGACHAR_GOLPE := 0.45      # m/s que recibe el resorte al agacharse o levantarse
 var _agachado := false
+# Despertar del oro (brazos normales -> brazos que contienen el oro): ver despertar_oro().
+signal pico_despertar                 # en el pico del despertar (el banco hace un destello)
+const DESPERTAR_SEG := 5.5
+var _despertar_t := -1.0              # s desde que empezo; -1 = no esta despertando
+var _despertar_base := 0.5            # venas_base al final
 # Colgado de una cornisa (Jugador.colgado): las manos suben al borde.
 const COLGADO_SUBIR := 0.24      # m
 const COLGADO_ADELANTE := 0.08   # m
@@ -179,6 +184,58 @@ func _buscar_todos(n: Node, clase: String) -> Array[Node]:
 	for c in n.get_children():
 		r.append_array(_buscar_todos(c, clase))
 	return r
+
+
+## Los brazos pasan de normales a contener el oro, en DESPERTAR_SEG s:
+##   0,00-0,15  las manos suben frente a la cara, con las palmas hacia uno.
+##   0,15-0,60  tiemblan (el espasmo de los gestos) y se cierran en puno; el oro entra: las venas crecen desde cero y un
+##              frente las enciende de los nudillos al codo en los dos brazos.
+##   0,60-0,72  pico: el oro arde (brillo ~3) y las manos se abren de golpe; destello y patada de FOV.
+##   0,72-1,00  el frente se retira, el brillo vuelve al latido de reposo y las manos bajan. Quedan las venas de reposo
+##              (`base`, por defecto 0,5: con poderes).
+func despertar_oro(base := 0.5) -> void:
+	_despertar_t = 0.0
+	_despertar_base = base
+	venas_base = 0.0
+
+
+## Brazos normales: las venas se retiran del todo (en ~1 s).
+func brazos_normales() -> void:
+	_despertar_t = -1.0
+	create_tween().tween_property(self, "venas_base", 0.0, 1.0)
+
+
+func despertando() -> bool:
+	return _despertar_t >= 0.0
+
+
+## Avanza el despertar; devuelve [peso de la pose 0..1, crecimiento, brillo] o [] si no hay despertar.
+func _despertar(dt: float) -> Array:
+	if _despertar_t < 0.0:
+		return []
+	var antes := _despertar_t / DESPERTAR_SEG
+	_despertar_t += dt
+	var t := _despertar_t / DESPERTAR_SEG
+	if antes < 0.62 and t >= 0.62:
+		pico_despertar.emit()
+		if cuerpo != null:
+			var tw := create_tween()
+			tw.tween_property(cuerpo, "patada_fov", 8.0, 0.12)
+			tw.tween_property(cuerpo, "patada_fov", 0.0, 0.9).set_ease(Tween.EASE_OUT)
+	if t >= 1.0:
+		_despertar_t = -1.0
+		venas_base = _despertar_base
+		if _capas != null:
+			_capas.apretar = 0.0
+		return []
+	var pose := smoothstep(0.0, 0.15, t) * (1.0 - smoothstep(0.8, 1.0, t))
+	venas_base = _despertar_base * smoothstep(0.15, 0.55, t)
+	var frente := smoothstep(0.18, 0.6, t) * (1.0 - smoothstep(0.72, 0.95, t))
+	var dolor := clampf((t - 0.15) / 0.5, 0.0, 1.0)
+	var brillo := 1.0 + 2.0 * smoothstep(0.2, 0.62, t) * (1.0 - smoothstep(0.66, 0.9, t)) + AnimProc.espasmo(dolor, 0.3) * 0.5 * frente
+	if _capas != null:
+		_capas.apretar = smoothstep(0.2, 0.45, t) * (1.0 - smoothstep(0.6, 0.66, t))
+	return [pose, frente, brillo, AnimProc.espasmo(dolor, 0.0) * smoothstep(0.15, 0.3, t) * (1.0 - smoothstep(0.62, 0.7, t))]
 
 
 func lanzar_gesto(poder: String) -> void:
@@ -344,6 +401,13 @@ func _process(dt: float) -> void:
 	var colg := cuerpo.colgado if cuerpo != null else 0.0
 	position += Vector3(0.0, COLGADO_SUBIR, -COLGADO_ADELANTE) * colg
 	rotation.x += COLGADO_CABECEO * colg
+	var desp := _despertar(dt)
+	if not desp.is_empty():
+		# Las manos frente a la cara, temblando.
+		var w: float = desp[0]
+		var temblor: float = desp[3]
+		position += Vector3(temblor * 0.006, 0.11 * w + temblor * 0.004, 0.05 * w)
+		rotation.x += 0.55 * w
 	rotation.z = -bob.x * BOB_ALABEO
 
 	if _capas != null:
@@ -358,7 +422,14 @@ func _process(dt: float) -> void:
 		_crec = maxf(sv[0], 0.0)
 		_crec_v = sv[1]
 		_piel.set_shader_parameter("venas_base", venas_base)
-		_piel.set_shader_parameter("crecimiento", _crec)
-		_piel.set_shader_parameter("crecimiento_otro", _crec * 0.3)
-		_piel.set_shader_parameter("brillo", AnimProc.brillo_venas(_tiempo, pv, mana))
-		_piel.set_shader_parameter("brillo_otro", AnimProc.brillo_venas(_tiempo, -1.0, mana))
+		if not desp.is_empty():
+			# Despertar: los dos brazos a la vez, con el frente y el brillo del despertar.
+			_piel.set_shader_parameter("crecimiento", maxf(_crec, desp[1]))
+			_piel.set_shader_parameter("crecimiento_otro", desp[1])
+			_piel.set_shader_parameter("brillo", desp[2])
+			_piel.set_shader_parameter("brillo_otro", desp[2])
+		else:
+			_piel.set_shader_parameter("crecimiento", _crec)
+			_piel.set_shader_parameter("crecimiento_otro", _crec * 0.3)
+			_piel.set_shader_parameter("brillo", AnimProc.brillo_venas(_tiempo, pv, mana))
+			_piel.set_shader_parameter("brillo_otro", AnimProc.brillo_venas(_tiempo, -1.0, mana))

@@ -49,13 +49,19 @@ Cada hito termina en PARADA, con capturas y números. No se sigue hasta el «sig
 | N0 | Escena del nivel. Sky3D con un día de 20 min y teclas para la hora. | Hecho (`38c39c3`) |
 | N1 | Relieve real, fondo en capas con niebla. | Hecho (`6e79cdd`). Pendiente: relieve más accidentado (pedido para después). |
 | N2 | Vida en el suelo: ichu con viento, flores, arbustos, árboles y piedras. | Hecho (`41c5827`) |
-| N3 | Zona 1, el pueblo: kit modular inca, kanchas, kallankas, colcas, plazas, escondrijos, pozos, tejados por donde correr, sótano secreto. | **Hecho en la rama `claude/modest-brahmagupta-bjqbe0`; PARADA pendiente** (probar en local) |
+| N3 | Zona 1, el pueblo: kit modular inca, kanchas, kallankas, colcas, plazas, escondrijos, pozos, tejados por donde correr, sótano secreto. | Hecho: `codigo/pueblo.gd`, `kit_inca.gd`, `materiales_inca.gd` |
 | N4 | Parkour: agarrarse a cornisas, subir a pulso, saltar entre tejados, trepar. PARADA: alturas medidas. | Hecho: `herramientas/probar_parkour.gd` (bordes de 1,2 a 3,5 m, huecos de hasta 8 m) |
-| N5 | Zona 2, el Qhapaq Ñan al templo: camino largo y laberíntico entre andenes y quebradas, el pozo, atajos y una cueva. | — |
-| N6 | Zona 3, el Templo del Sol: plataformas escalonadas, ushnu y portada de doble jamba, con vista al amanecer. | — |
-| N7 | Cierre: regresión, rendimiento, README y memoria. | — |
+| N5 | Zona 2, el Qhapaq Ñan al templo: camino largo y laberíntico entre quebradas, el pozo, atajos y una cueva. | Hecho: `codigo/camino.gd` (~830 m, escalinatas, 2 atajos, tambo, pozo de 15 m, cueva de 160 m) |
+| N6 | Zona 3, el Templo del Sol: plataformas escalonadas, ushnu y portada de doble jamba, con vista al amanecer. | Hecho: `codigo/templo.gd` (orientado a 65,8°), plaza circular de Caral, `codigo/cordillera.gd` (nevados lejanos) |
+| N7 | Cierre: regresión, rendimiento, README y memoria. | Hecho en la nube (pruebas headless y capturas por software); **falta medir FPS en la GPU y jugarlo en local** |
 
-Después: lluvia; brazos normales → oro; portar `core/` (españoles).
+Después del nivel:
+
+| Qué | Estado |
+|---|---|
+| Lluvia | Hecha: `codigo/lluvia.gd` (tecla L) |
+| Brazos normales → oro | Hecho: `Manos.despertar_oro()` (tecla B) |
+| Portar `core/` (españoles, combate, diálogos…) | Pendiente: falta el repo `chasqui-code` |
 
 ## Verificación
 
@@ -63,13 +69,30 @@ Después: lluvia; brazos normales → oro; portar `core/` (españoles).
 - Capturas y tiras de cuadros con `game_eval`. Para el pueblo: `herramientas/recorrido_pueblo.gd`.
 - FPS medido en cada zona (meta: ≥ 60 en la RTX 4070 SUPER).
 - `game_get_errors` limpio.
-- Licencias apuntadas en `CREDITOS.md` antes de bajar nada. N3 no baja assets nuevos.
+- Licencias apuntadas en `CREDITOS.md` antes de bajar nada. N3 a N7 no bajan assets nuevos (la cueva reutiliza las rocas de Poly Haven).
 
 ## Notas de N3 para quien siga
 
 - **Dónde está:** `codigo/pueblo.gd` dice dónde va cada cosa; `codigo/kit_inca.gd` dice cómo se arma cada pieza.
 - **Coordenadas:** las del pueblo son locales (+x este, +z sur), giradas `Pueblo.ROT` (−9°) alrededor de la plaza, con la y del mundo.
 - **Plataformas:** cada kancha va en su propia plataforma, a la altura del punto más alto de su suelo + 0,25 m. Las escaleras exteriores salvan el desnivel; su colisión es una rampa de 37°.
-- **Vegetación:** `Terreno.poner_obras()` recibe la máscara de obra. Hay que llamarlo antes de crear `Vegetacion`, y así lo hace `nivel1.gd`.
+- **Vegetación:** `Terreno.pintar_obras()` recibe las huellas de cada obra (pueblo, camino, templo). Hay que llamarlo antes de crear `Vegetacion`, y así lo hace `nivel1.gd`.
 - **Probado en la nube** con Godot 4.7.2 (nixpkgs). La importación y el nivel en headless corren sin errores; el recorrido se renderizó con Vulkan por software (lavapipe), así que esos FPS no cuentan. Falta medir FPS en la RTX 4070 SUPER y jugarlo.
 - **Para N4:** los techos están a 40° (se puede caminar por ellos; el `floor_max_angle` es de 45°). Los muros del cerco miden 2,3 m y los fardos dan escalones de 0,55 m. Las sarunas de los andenes miden 0,45 m de vuelo, cada 0,55 m de alto.
+
+## Notas de N5 a N7 para quien siga
+
+- **Orden en `nivel1.gd`:** terreno → pueblo → cordillera → templo → camino (acaba en `templo.entrada`) → vegetación → lluvia.
+- **Huecos del terreno:** `Terreno.abrir_hueco(x, z, radio, radio_colision)`. El dibujo se descarta en el shader (16 huecos como máximo). La colisión lleva NaN en el `HeightMapShape3D` y solo funciona bien con **Jolt** (el proyecto ya lo usa). La pieza de dentro debe tapar el borde: la losa del pozo, y el faldón de colisión y las rocas en la boca de la cueva.
+- **El pozo del despertar:** `Camino.POZO`, de 15 m. El fondo es `Camino.despertar` (un `Marker3D`), y la salida es la cueva (`Camino.CUEVA`).
+- **Atajos:** se eligen solos (`Camino._atajos`): pares de puntos del camino a ≤ 60 m en línea recta, con 5 a 22 m de desnivel y más de 20 m de camino ahorrado.
+- **Templo:** marco local con −z hacia el amanecer del 21 de junio (`Templo.ACIMUT_AMANECER`). Los miradores `amanecer` y `atardecer` llevan su hora.
+- **Pruebas:**
+  - `herramientas/probar_parkour.gd` y `herramientas/probar_camino.gd`, en headless y con `--fixed-fps 60`.
+  - `herramientas/recorrido_pueblo.gd`, con argumentos de hora, miradores y lluvia.
+  - `herramientas/capturar_despertar.gd`.
+- **Pendiente:**
+  - Medir FPS en la GPU por zona.
+  - Jugarlo en local.
+  - El relieve más accidentado de N1.
+  - Portar `core/` (españoles), que requiere el repo `chasqui-code`.

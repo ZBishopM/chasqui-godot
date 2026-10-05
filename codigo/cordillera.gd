@@ -18,7 +18,7 @@ render_mode cull_disabled;
 uniform vec3 color_roca : source_color = vec3(0.42, 0.38, 0.34);
 uniform vec3 color_puna : source_color = vec3(0.55, 0.48, 0.33);
 uniform vec3 color_nieve : source_color = vec3(0.93, 0.95, 1.0);
-uniform float cota_nieve = 1700.0;   // m sobre la plaza (3482 m): la nieve empieza hacia los 5200 m
+uniform float cota_nieve = 2150.0;   // m sobre la plaza (3482 m): la nieve empieza hacia los 5600 m (solo las cumbres)
 varying vec3 v_pos;
 varying vec3 v_nor;
 
@@ -65,8 +65,9 @@ func _ready() -> void:
 			var p := dir * r
 			# Envolvente: sube desde debajo del horizonte, cumbres a media distancia, baja algo al fondo.
 			var env := smoothstep(0.0, 0.35, f) * (1.0 - 0.35 * smoothstep(0.75, 1.0, f))
-			var cresta := ruido.get_noise_2d(p.x, p.y) * 0.5 + 0.5
-			var alto := -900.0 + env * (900.0 + 1400.0 + 1500.0 * cresta)
+			# Crestas desiguales: la mayoria se queda en puna y roca; solo algunas pasan la cota de nieve.
+			var cresta := pow(ruido.get_noise_2d(p.x, p.y) * 0.5 + 0.5, 1.7)
+			var alto := -900.0 + env * (900.0 + 900.0 + 2900.0 * cresta)
 			# Mas altos detras del amanecer (ENE) y hacia el norte.
 			var hacia_sol := cos(a - deg_to_rad(ACIMUT_SOL))
 			alto += env * 700.0 * maxf(hacia_sol, 0.0)

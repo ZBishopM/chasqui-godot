@@ -35,7 +35,10 @@ El editor y la demo que lanza Claude (por el MCP de Godot) **conviven**: son dos
 | `F1` · `Esc` | oculta el HUD · libera el mouse |
 | `F2` | banco ↔ Nivel 1 (Vilcashuamán) |
 | `RePág` / `AvPág` · `Inicio` · `Fin` | (nivel) una hora más / menos · salta al amanecer · pausa el reloj |
-| `F3` (Mayús: atrás) | (nivel) siguiente mirador del pueblo: plaza, casa, tejado, patio, kallanka, sótano… |
+| `F3` (Mayús: atrás) | (nivel) siguiente mirador: pueblo, camino, pozo, cueva, templo, amanecer… |
+| `L` | (nivel) lluvia: empieza o para (tarda unos segundos; el suelo se moja y se seca despacio) |
+| `B` | brazos normales; otra vez: el despertar del oro (de brazos normales a brazos que contienen el oro) |
+| `W` / `Espacio` · `A`/`D` · `S`/`Ctrl` | (colgado de una cornisa) subir a pulso · desplazarse · soltarse (`S` + `Espacio`: salto atrás) |
 
 El HUD muestra, por cada categoría, el candidato actual con su licencia y autor.
 
@@ -150,14 +153,57 @@ Plan por hitos en `docs/PLAN_NIVEL1.md` (cada hito termina en PARADA con captura
   - **Escondites:** colcas en las que se entra agachado, casas oscuras, fardos, y un sótano bajo una casa del oeste. Al sótano se entra por una trampilla tapada por fardos, y se sale a gatas por el muro de la plataforma.
   - **Suelo de obra:** `Pueblo` pinta una máscara (`Terreno.poner_obras`). Ahí no crece ichu, no se reparten plantas y el terreno pinta tierra pisada.
 
+- **N5, el Qhapaq Ñan** (`codigo/camino.gd`): la zona 2, unos 830 m desde la plaza (por el callejón del este y el norte de los andenes) hasta la explanada del templo, con ~85 m de subida.
+  - **Calzada:** 3,6 m de losas sobre un trazado de coste mínimo calculado en el relieve real, con curvas de herradura añadidas.
+  - **Escalinatas** donde la pendiente pasa del 18 % (177 m en total). Su colisión es una rampa.
+  - **Muros y parapetos:** muro de contención donde va en terraplén, parapeto donde la caída pasa de 1,5 m.
+  - **Atajos:** donde el camino da la vuelta, terrazas de ≤ 2,4 m que se trepan con el parkour (el mejor ahorra 84 m).
+  - **Tambo** (posada) y, junto a él, la plazuela del **pozo**: 15 m de caída hasta una cámara, que es donde despertará el Chasqui (`Camino.despertar`, un `Marker3D`).
+  - **Cueva:** 160 m de túnel, oscuro lejos de las bocas, que sale en trinchera a la ladera entre el pueblo y el camino, con rocas en la boca.
+  - **Corrales** de pirca para esconderse.
+  - **Huecos en el terreno:** `Terreno.abrir_hueco()` no dibuja el suelo y lo quita de la colisión (NaN en el `HeightMapShape3D`).
+- **Física:** el proyecto usa **Jolt** (`project.godot`). Godot Physics daba normales NaN junto a los huecos del terreno; con Jolt las pruebas de parkour dan lo mismo.
+- **N6, el Templo del Sol** (`codigo/templo.gd`): todo el recinto mira a la salida del sol del 21 de junio (acimut 65,8°, ENE).
+  - **Plataforma ceremonial** de 68 × 64 m, adonde llega la calzada.
+  - **Plaza circular hundida** como la de Caral: tres gradas de 0,8 m.
+  - **Templo de tres terrazas** de piedra poligonal con escalinata. Arriba está el **Inti Wasi**, con portada de doble jamba al oeste y puerta al este, al borde, frente al horizonte.
+  - **Ushnu** con escalinata, portada de doble jamba y el sillón del Inca.
+  - **Miradores:** `amanecer` (6:33) y `atardecer` (17:18) se capturan a su hora.
+- **El fondo** (`codigo/cordillera.gd`): un anillo de cordillera de 21 a 38 km, más allá del relieve real.
+  - Delante, picos en pan de azúcar como el Huayna Picchu; detrás, nevados más altos hacia el ENE, por donde sale el sol.
+  - Es geometría a distancias reales, así que da paralaje, y la niebla de Sky3D la azula.
+- **Lluvia** (`codigo/lluvia.gd`, tecla `L`):
+  - **Gotas:** partículas GPU que siguen a la cámara con el viento del valle. Chocan con un campo de alturas que también la sigue (no llueve bajo techo ni en la cueva) y salpican.
+  - **Cielo:** se cubre, el sol pierde fuerza y la bruma se espesa.
+  - **Superficies mojadas:** la variable global `humedad` (`[shader_globals]` en `project.godot`) moja poco a poco el terreno, la piedra, la paja y el ichu, que se ven más oscuros y brillantes. En lo llano se forman charcos.
+- **Despertar del oro** (`Manos.despertar_oro()`, tecla `B`), de brazos normales a brazos que contienen el oro, en 5,5 s:
+  - Las manos suben frente a la cara.
+  - Tiemblan con el espasmo de los gestos y se cierran en puño (`CapasManos.apretar`).
+  - Las venas crecen desde cero y un frente las enciende de los nudillos al codo, en los dos brazos.
+  - Pico: destello, patada de FOV y las manos se abren.
+  - Queda el oro de reposo latiendo (`venas_base` 0,5).
+
 Recorrido con capturas y números, sin el MCP (necesita ventana):
 
 ```
 godot.console.exe --path . --script res://herramientas/recorrido_pueblo.gd          # 10:30
 godot.console.exe --path . --script res://herramientas/recorrido_pueblo.gd -- 17.5  # a otra hora
+godot.console.exe --path . --script res://herramientas/recorrido_pueblo.gd -- 15 patio,vista,pozo lluvia   # solo esos, lloviendo
+godot.console.exe --path . --fixed-fps 20 --script res://herramientas/capturar_despertar.gd               # tira del despertar del oro
+godot.console.exe --headless --path . --fixed-fps 60 --script res://herramientas/probar_camino.gd        # recorre camino, templo, pozo y cueva
 ```
 
-Con el MCP: `game_eval` → `await capturar_recorrido()` en la escena del nivel. Deja `capturas/pueblo_<n>_<mirador>.png` e imprime FPS, primitivas y llamadas de dibujo por mirador.
+`probar_camino.gd` hace todo el recorrido manejando al jugador. Último resultado:
+
+| Prueba | Resultado |
+|---|---|
+| Calzada | llega al templo en 168 s (826 m) |
+| Templo | sube las tres terrazas, cruza el Inti Wasi y llega al borde este |
+| Ushnu | sube a la cima |
+| Pozo | cae 16 m y queda en la cámara |
+| Cueva | sale a la ladera en 33 s |
+
+Con el MCP: `game_eval` → `await capturar_recorrido()` en la escena del nivel. Deja `capturas/nivel1_<n>_<mirador>.png` e imprime FPS, primitivas y llamadas de dibujo por mirador.
 
 ## Pruebas automáticas
 

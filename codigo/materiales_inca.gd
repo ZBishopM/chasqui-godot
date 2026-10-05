@@ -5,6 +5,7 @@ extends RefCounted
 ## Poly Haven que ya usa el terreno dan el grano fino.
 ##   pirca     piedra de campo asentada con barro (casas comunes, cercos, andenes)
 ##   silleria  bloques labrados en hiladas, juntas finas (kallanka, casas de los curacas)
+##   poligonal piedras encajadas de muchos lados (templo); losa, la del camino, mas oscura
 ##   ichu      techo de paja en hileras
 ##   tierra    suelo apisonado (plataformas, patios)
 ##   roca      paredes de las cuevas (oscurecidas por el color de vertice)
@@ -20,6 +21,7 @@ uniform vec3 color_piedra : source_color = vec3(0.60, 0.54, 0.46);
 uniform vec3 color_piedra2 : source_color = vec3(0.56, 0.47, 0.38);
 uniform vec3 color_barro : source_color = vec3(0.52, 0.42, 0.31);
 uniform float profundidad = 0.035; // m que se hunde la junta respecto a la cara de la piedra
+global uniform float humedad;      // lluvia: la piedra mojada oscurece y brilla; la junta de barro tarda en secar
 
 float azar(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -102,6 +104,8 @@ void fragment() {
 	vec3 medio = mix(color_barro, mix(color_piedra, color_piedra2, 0.5), modo == 0 ? 0.75 : 0.95);
 	ALBEDO = mix(mix(c_junta, c_piedra, piedra), medio, lejos);
 	ROUGHNESS = mix(0.95, 0.85, piedra);
+	ALBEDO *= mix(1.0, mix(0.55, 0.72, piedra), humedad);
+	ROUGHNESS = mix(ROUGHNESS, mix(0.6, 0.28, piedra), humedad);
 	AO = mix(0.75, 1.0, piedra);
 	AO_LIGHT_AFFECT = 0.2;
 	// Relieve sin tangentes: gradiente de la altura en pantalla (bump mapping de Mikkelsen).
@@ -122,6 +126,7 @@ shader_type spatial;
 uniform vec3 color_nuevo : source_color = vec3(0.64, 0.53, 0.32);
 uniform vec3 color_viejo : source_color = vec3(0.47, 0.44, 0.38);
 uniform float hilera = 0.32;   // m de pendiente que cubre cada hilera de paja
+global uniform float humedad;  // lluvia: la paja mojada se oscurece
 uniform float profundidad = 0.03;
 
 float azar(vec2 p) {
@@ -153,7 +158,8 @@ void fragment() {
 	float dist = length(VERTEX);
 	float lejos = smoothstep(30.0, 90.0, dist);
 	ALBEDO = mix(c, mix(color_viejo, color_nuevo, 0.5) * 0.85, lejos);
-	ROUGHNESS = 1.0;
+	ALBEDO *= mix(1.0, 0.62, humedad);
+	ROUGHNESS = mix(1.0, 0.7, humedad);
 	SPECULAR = 0.2;
 	AO = mix(0.6, 1.0, smoothstep(0.0, 0.4, t));
 	AO_LIGHT_AFFECT = 0.4;
@@ -195,6 +201,12 @@ static func todos() -> Dictionary:
 	silleria.set_shader_parameter("profundidad", 0.02)
 	var poligonal := silleria.duplicate() as ShaderMaterial
 	poligonal.set_shader_parameter("modo", 2)
+	# Losas del Qhapaq Ñan: piedra poligonal mas oscura y gastada que la del templo.
+	var losa := poligonal.duplicate() as ShaderMaterial
+	losa.set_shader_parameter("color_piedra", Color(0.47, 0.43, 0.38))
+	losa.set_shader_parameter("color_piedra2", Color(0.42, 0.37, 0.31))
+	losa.set_shader_parameter("color_barro", Color(0.36, 0.29, 0.21))
+	losa.set_shader_parameter("tam", 0.2)
 
 	var sh_ichu := Shader.new()
 	sh_ichu.code = SHADER_ICHU
@@ -232,6 +244,6 @@ static func todos() -> Dictionary:
 
 	_cache = {
 		"pirca": pirca, "silleria": silleria, "poligonal": poligonal, "ichu": ichu,
-		"tierra": tierra, "madera": madera, "ceramica": ceramica, "agua": agua, "roca": roca,
+		"tierra": tierra, "madera": madera, "ceramica": ceramica, "agua": agua, "roca": roca, "losa": losa,
 	}
 	return _cache

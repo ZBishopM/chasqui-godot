@@ -1,7 +1,7 @@
 extends Node3D
 ## Banco de combinaciones de Chasqui: arena greybox + jugador en primera persona.
 ## Teclas: 1 manos · 2 personaje · 3 VFX · 4 estilo (Mayus = anterior) · F G R T V C poderes · Mayus esprintar · Ctrl agacharse
-##         F2 nivel 1 (y vuelta)
+##         F2 nivel 1 (y vuelta) · B brazos normales / despertar del oro
 ##         Tab vitrina · K guardar combinacion · F1 ocultar HUD · Esc libera el mouse
 
 const ARCHIVO := "res://combinacion.json"
@@ -57,6 +57,7 @@ func _ready() -> void:
 	sombra.manos = manos
 	jugador.add_child(sombra)
 	_crear_hud()
+	manos.pico_despertar.connect(func() -> void: flash(0.35, 0.7))
 	_cargar()
 	_aplicar_todo()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -84,6 +85,12 @@ func _unhandled_input(ev: InputEvent) -> void:
 		get_tree().change_scene_to_file.call_deferred(_escena_alterna())
 	elif k.keycode == KEY_F1:
 		_hud.visible = not _hud.visible
+	elif k.keycode == KEY_B:
+		# Brazos normales; y otra vez: despiertan con el oro.
+		if manos.venas_base > 0.25 or manos.despertando():
+			manos.brazos_normales()
+		else:
+			manos.despertar_oro()
 
 
 ## Escena a la que lleva F2 (el nivel la redefine para volver al banco).
@@ -279,7 +286,7 @@ func _actualizar_hud() -> void:
 		lineas.append("[%d] %-10s %s %s%s" % [i + 1, cat.capitalize(), e.get("id", ""), e.nombre, lic])
 	lineas.append("")
 	lineas.append("F Halcon · G Sapo · R Amaru · T Condor · V Puma · C Colibri (Mayus+C ralentiza)")
-	lineas.append("O ofrenda (Loot VFX, rareza cicla) · Mayus+1..4 anterior · Tab vitrina · K guardar · F1 ocultar · Esc mouse")
+	lineas.append("O ofrenda (Loot VFX, rareza cicla) · B brazos normales / despertar del oro · Mayus+1..4 anterior · Tab vitrina · K guardar · F1 ocultar · Esc mouse")
 	lineas.append("WASD andar · Mayus esprintar · Ctrl agacharse · Espacio saltar")
 	_hud.text = "\n".join(lineas)
 

@@ -46,6 +46,7 @@ uniform float alcance = 55.0;   // m: mas alla las matas se encogen hasta desapa
 uniform float inicio = 0.0;     // m: mas aca tambien (es el otro anillo)
 uniform vec3 color_base : source_color = vec3(0.45, 0.39, 0.24);
 uniform vec3 color_punta : source_color = vec3(0.82, 0.73, 0.50);
+global uniform float humedad;   // lluvia: la paja mojada se oscurece
 
 varying float v_alto;
 varying float v_tono;
@@ -93,6 +94,7 @@ void vertex() {
 void fragment() {
 	vec3 c = mix(color_base, color_punta, smoothstep(0.0, 0.9, v_alto));
 	c *= 0.8 + 0.4 * v_tono;
+	c *= mix(1.0, 0.72, humedad);
 	ALBEDO = c;
 	ROUGHNESS = 0.9;
 	BACKLIGHT = c * 0.5;                         // la paja deja pasar la luz

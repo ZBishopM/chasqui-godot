@@ -25,6 +25,7 @@ const PUNO_CLIP := {".L": "halcon", ".R": "condor"}
 var giro_puno := 0.0     # grados que el antebrazo gira hacia pulgar arriba al esprintar (catalogo `giro_puno`)
 var en_reposo := false   # lo fija Manos: sin gesto, quieto y en el suelo
 var bombeo := 0.0        # 0..1, lo fija Manos con el esprint
+var apretar := 0.0       # 0..1, lo fija Manos: las dos manos se cierran en puno (despertar del oro)
 var fase_paso := 0.0     # rad, lo fija Manos: un ciclo = dos pisadas
 var tic_actual := ""
 var _brazo := {}         # lado -> [brazo, antebrazo, mano, la mano cuelga aparte (H4)]
@@ -126,6 +127,9 @@ func _process_modification_with_delta(delta: float) -> void:
 	var sk := get_skeleton()
 	if bombeo > 0.001:
 		_bombear(sk)
+	if apretar > 0.001:
+		for s: String in LADOS:
+			_cerrar_puno(sk, s, apretar)
 	if tic_actual == "":
 		if en_reposo:
 			_espera -= delta
