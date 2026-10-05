@@ -84,10 +84,13 @@ float manchas(vec2 p) {
 	return s + ruido(p) * 0.15;
 }
 
-// Pulso doble del corazon (lub-dub), 0..1.
+// Pulso doble del corazon (lub-dub), 0..1. Cuadrados a mano: pow() con base negativa no esta definido en GLSL y en
+// algunas GPU da NaN (la malla desaparecia ~0,17 s en cada latido).
 float pulso(float t) {
 	float f = fract(t * 1.15);
-	return exp(-pow(f * 13.0, 2.0)) + 0.6 * exp(-pow((f - 0.2) * 13.0, 2.0));
+	float a = f * 13.0;
+	float b = (f - 0.2) * 13.0;
+	return exp(-a * a) + 0.6 * exp(-b * b);
 }
 
 void vertex() {
@@ -96,7 +99,8 @@ void vertex() {
 	float detras = 1.0 - smoothstep(crec - 0.08, crec, COLOR.g);   // 1 donde ya llego el poder
 	v_tam = mix(venas_base, 1.0, detras * step(0.001, crec));
 	v_encendido = detras * step(0.001, crec) * (del_poder ? brillo : brillo_otro);
-	v_frente = exp(-pow((COLOR.g - crec) * 14.0, 2.0)) * step(0.001, crec);
+	float df = (COLOR.g - crec) * 14.0;   // sin pow(): la base es negativa detras del frente
+	v_frente = exp(-df * df) * step(0.001, crec);
 	// Alto y ancho crecen con el tamaño; el ancho menos (por debajo de ~60 % la malla no tiene vertices para dibujarlo).
 	float ancho = grosor * (0.6 + 0.4 * v_tam);
 	float h = altura * 1.6 * COLOR.b * v_tam * (1.0 + latido * pulso(TIME));
