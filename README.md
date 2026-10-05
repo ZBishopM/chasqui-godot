@@ -91,6 +91,7 @@ Capa de resorte sobre la altura de las manos (`Manos._salto`): al despegar se qu
 - **Bordes bajos:** si el borde queda por debajo del pecho, sube de una vez.
 - **Bordes altos:** si queda más arriba, se cuelga y las manos suben a agarrarlo (`Jugador.colgado` → `Manos`).
 - **Colgado:** A/D se desplaza por la cornisa (1,4 m/s, se para donde acaba el borde); W o Espacio sube a pulso (agachado si arriba no cabe de pie); Ctrl o S se suelta; S + Espacio salta hacia atrás.
+- **Encima en pendiente** (aleros de los techos de ichu a 40°): al subir, el cuerpo se apoya sobre la superficie y no a la altura del borde. Antes quedaba dentro de la pendiente y no subía.
 - **Saltos:** tiempo de coyote y salto anticipado de 0,12 s.
 
 Medido con `herramientas/probar_parkour.gd` (headless):
@@ -142,6 +143,11 @@ Plan por hitos en `docs/PLAN_NIVEL1.md` (cada hito termina en PARADA con captura
 
 - **N0, cielo** (`codigo/nivel1.gd`, `addons/sky_3d`): Sky3D con la latitud, la longitud y la fecha reales (21 de junio de 1532, Inti Raymi). Un día = 20 min.
 - **N1, relieve** (`codigo/terreno.gd`, `herramientas/recortar_dem.gd`, `hornear_relieve.gd`): Copernicus GLO-30 alrededor de la plaza, en tres anillos (1,2 km a 2 m jugables, 12 km, 39 km).
+  - **Quebrado** (`hornear_relieve.gd`, `_quebrar`): la altura se exagera ×1,4 en la zona jugable y hasta ×2,6 a partir de unos 6 km, con riscos (ruido de crestas) donde ya hay pendiente y detalle fino de 1 a 2,6 m que respeta lo llano (pueblo, explanada).
+  - **Dos abras al sol** (`ABRAS`): desde el pueblo, un hueco en V a 292–296° (entre 9,8° y 5°) donde se pone el sol del 21 de junio; desde el templo, un abra a 64–68° por donde sale. `herramientas/perfil_horizonte.gd x z desde hasta paso` imprime el perfil del horizonte desde cualquier punto.
+- **El valle y el cielo:**
+  - **Chacras** (`terreno.gd`): en los fondos de valle lejanos, parcelas de verdes y ocres con pircas oscuras y árboles sueltos, todo dibujado en el shader.
+  - **Nubes** (`nivel1.gd`): cúmulos grandes y bajos, de vientre gris (Sky3D), y sus sombras corren por el relieve. Mirador `nubes` en la plaza.
 - **N2, suelo vivo** (`codigo/vegetacion.gd`): ichu procedural con viento, y flores, matorrales, árboles y rocas de Poly Haven.
 - **N3, el pueblo** (`codigo/pueblo.gd`, `codigo/kit_inca.gd`, `codigo/materiales_inca.gd`):
   - **Traza:** cuadrícula como Ollantaytambo, girada 9°. Manzanas de dos kanchas (cercos con casas alrededor de un patio) y callejones de 4 m alrededor de una plaza de 92 × 56 m. Al norte de la plaza, dos kallankas de sillería con seis puertas.
@@ -172,6 +178,16 @@ Plan por hitos en `docs/PLAN_NIVEL1.md` (cada hito termina en PARADA con captura
 - **El fondo** (`codigo/cordillera.gd`): un anillo de cordillera de 21 a 38 km, más allá del relieve real.
   - Delante, picos en pan de azúcar como el Huayna Picchu; detrás, nevados más altos hacia el ENE, por donde sale el sol.
   - Es geometría a distancias reales, así que da paralaje, y la niebla de Sky3D la azula.
+- **El hogar del Chasqui** (`codigo/hogar.gd`): una kancha pequeña sobre su terraza en el borde oeste del pueblo, más allá de las casas redondas.
+  - **Orientación:** la puerta trapezoidal de la casa mira al ONO (294°), y por la tarde el sol entra por ella.
+  - **Haz de sol:** láminas de luz aditiva que salen del vano en la dirección real del sol, con polvo flotando. Se recalculan con el sol y brillan según lo alineado que esté con la puerta, su altura y su fuerza, así que se apagan de mañana, de noche y con lluvia.
+  - **Niebla volumétrica:** un `FogVolume` suave dentro de la casa, que solo se enciende a menos de 40 m. Sola no basta: sus celdas son demasiado gruesas para un vano de 1 m.
+  - **Desde el umbral,** sobre el murete del patio, el sol se pone en el abra entre los cerros. La cordillera del fondo tiene una brecha a 293° para no taparlo.
+  - **Dentro:** suelo de tierra con mantas tejidas (shader `manta` en `materiales_inca.gd`: franjas y rombos de pallay), cama de ichu, fogón de tres piedras con ollas y una luz que titila, hornacinas con queros y un aríbalo, maíz y hierbas colgados de los tirantes, el quipu junto a la puerta, un batán y vigas a la vista.
+  - **Patio:** arriates con flores de Poly Haven, arbustos, banco de piedra frente a la vista, aríbalos, leña y una chaquitaclla.
+  - **Acceso y parkour:** se entra por una portada del cerco, con escalera desde fuera. Por los fardos de junto a la puerta se sube al alero y al techo.
+  - **Miradores:** `hogar` (16:00, hacia la puerta y el haz), `rayo` (16:00, el cuarto junto a la cama), `umbral` (17:06, la puesta) y `patio_hogar` (16:30).
+  - **Sombras del fogón:** solo las proyectan las piezas del hogar (`shadow_caster_mask`); si no, su mapa cúbico volvía a dibujar el terreno y el ichu y doblaba las primitivas.
 - **Lluvia** (`codigo/lluvia.gd`, tecla `L`):
   - **Gotas:** partículas GPU que siguen a la cámara con el viento del valle. Chocan con un campo de alturas que también la sigue (no llueve bajo techo ni en la cueva) y salpican.
   - **Cielo:** se cubre, el sol pierde fuerza y la bruma se espesa.
@@ -191,17 +207,20 @@ godot.console.exe --path . --script res://herramientas/recorrido_pueblo.gd -- 17
 godot.console.exe --path . --script res://herramientas/recorrido_pueblo.gd -- 15 patio,vista,pozo lluvia   # solo esos, lloviendo
 godot.console.exe --path . --fixed-fps 20 --script res://herramientas/capturar_despertar.gd               # tira del despertar del oro
 godot.console.exe --headless --path . --fixed-fps 60 --script res://herramientas/probar_camino.gd        # recorre camino, templo, pozo y cueva
+godot.console.exe --headless --path . --fixed-fps 60 --script res://herramientas/probar_hogar.gd         # entra al hogar y sube a su techo
 ```
 
 `probar_camino.gd` hace todo el recorrido manejando al jugador. Último resultado:
 
 | Prueba | Resultado |
 |---|---|
-| Calzada | llega al templo en 168 s (826 m) |
+| Calzada | llega al templo en 171 s (825 m, 334 de escalinata, sobre el relieve quebrado) |
 | Templo | sube las tres terrazas, cruza el Inti Wasi y llega al borde este |
 | Ushnu | sube a la cima |
 | Pozo | cae 16 m y queda en la cámara |
 | Cueva | sale a la ladera en 33 s |
+
+`probar_hogar.gd`: entra por la portada y la puerta hasta el fondo de la casa en 4 s, sin atascos; desde los fardos sube al techo y llega a la cumbrera (4,9 m).
 
 Con el MCP: `game_eval` → `await capturar_recorrido()` en la escena del nivel. Deja `capturas/nivel1_<n>_<mirador>.png` e imprime FPS, primitivas y llamadas de dibujo por mirador.
 

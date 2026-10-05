@@ -225,6 +225,12 @@ func _colgado(delta: float) -> void:
 ## se queda colgado.
 func _subir() -> void:
 	var destino := borde - normal_muro * 0.5 + Vector3.UP * 0.03
+	# Encima puede seguir subiendo (un techo de ichu a 40 grados): el destino se apoya en la superficie, no a la altura
+	# del borde, que quedaria dentro de la pendiente.
+	var suelo := _rayo(destino + Vector3.UP * 1.2, destino + Vector3.DOWN * 0.3)
+	if not suelo.is_empty() and (suelo.normal as Vector3).y >= 0.7:
+		# En pendiente la capsula toca el plano por el lado de arriba: se levanta lo que pide su radio.
+		destino.y = (suelo.position as Vector3).y + _capsula.radius * (1.0 / (suelo.normal as Vector3).y - 1.0) + 0.03
 	if _choca_en(destino, ALTURA.x):
 		if _choca_en(destino, ALTURA.y):
 			return

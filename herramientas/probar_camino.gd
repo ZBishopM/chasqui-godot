@@ -35,8 +35,8 @@ func _soltar_todo() -> void:
 		Input.action_release(a)
 
 
-## Sigue la lista de puntos (mundo, xz) andando. Devuelve [llego, segundos, atascos, minimo bajo el suelo esperado].
-func _seguir(puntos: PackedVector2Array, esperado: Callable, limite_s: float) -> Array:
+## Sigue la lista de puntos (mundo, xz) andando; cada punto vale a `radio` m. Devuelve [llego, segundos, atascos, minimo bajo el suelo esperado].
+func _seguir(puntos: PackedVector2Array, esperado: Callable, limite_s: float, radio := 2.5) -> Array:
 	var k := 0
 	var t := 0.0
 	var atascos: PackedStringArray = []
@@ -49,7 +49,7 @@ func _seguir(puntos: PackedVector2Array, esperado: Callable, limite_s: float) ->
 		t += 1.0 / 60.0
 		var p := j.global_position
 		var meta := puntos[k]
-		if Vector2(p.x, p.z).distance_to(meta) < 2.5:
+		if Vector2(p.x, p.z).distance_to(meta) < radio:
 			k += 1
 			continue
 		var d := Vector2(meta.x - p.x, meta.y - p.z)

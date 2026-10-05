@@ -16,6 +16,7 @@ const AMANECER := 6.25         # hora a la que salta Inicio (el sol asoma hacia 
 var cielo: Sky3D
 var terreno: Terreno
 var pueblo: Pueblo
+var hogar: Hogar
 var camino: Camino
 var templo: Templo
 var vegetacion: Vegetacion
@@ -33,6 +34,10 @@ func _ready() -> void:
 	pueblo = Pueblo.new()
 	pueblo.terreno = terreno
 	add_child(pueblo)
+	hogar = Hogar.new()   # la casa del Chasqui, al oeste del pueblo
+	hogar.terreno = terreno
+	hogar.sol = cielo.sun
+	add_child(hogar)
 	add_child(Cordillera.new())   # el fondo: nevados de 21 a 38 km
 	# El templo antes que el camino: el camino acaba al pie de su escalinata.
 	templo = Templo.new()
@@ -43,6 +48,7 @@ func _ready() -> void:
 	camino.destino = Vector2(templo.entrada.x, templo.entrada.z)
 	add_child(camino)
 	miradores.append_array(pueblo.miradores)
+	miradores.append_array(hogar.miradores)
 	miradores.append_array(camino.miradores)
 	miradores.append_array(templo.miradores)
 	vegetacion = Vegetacion.new()
@@ -80,16 +86,32 @@ func _crear_entorno() -> void:
 	cielo.minutes_per_day = MINUTOS_POR_DIA
 	# Niebla para un valle andino seco de ~40 km (la de Sky3D viene para 1 km). Su "nivel del mar" corta los rayos que
 	# bajan de y = 0 (la plaza) y dibujaba una raya recta en el horizonte: se baja por debajo de todo el relieve.
-	cielo.sky.fog_sea_level = -2000.0
+	cielo.sky.fog_sea_level = -4800.0   # bajo los valles mas hondos del relieve quebrado (~ -4000 m)
 	cielo.sky.fog_density = 0.00006
 	cielo.sky.fog_end = 30000.0
 	cielo.sky.fog_falloff = 1.0
+	# Nubes grandes y cercanas, de vientre gris (como las de la costa y los valles en la tarde): cumulos mas grandes
+	# (cumulus_size bajo = menos repeticion), mas cubierto, mas gruesos y que absorben mas luz por debajo.
+	cielo.sky.cumulus_size = 0.35
+	cielo.sky.cumulus_coverage = 0.6
+	cielo.sky.cumulus_thickness = 0.046
+	cielo.sky.cumulus_absorption = 4.6
+	cielo.sky.cumulus_intensity = 0.9
+	cielo.sky.cumulus_noise_freq = 3.1   # bordes mas recortados
+	cielo.sky.cirrus_coverage = 0.35
 	var env := cielo.environment
 	env.glow_enabled = true
 	env.glow_intensity = 0.5
 	env.glow_hdr_threshold = 0.9
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
 	env.ssao_enabled = true
+	# Niebla volumetrica sin densidad propia: solo la ponen los FogVolume (el haz de sol que entra al hogar). Se
+	# enciende cerca del hogar (_process), que es caro en todo el nivel.
+	env.volumetric_fog_density = 0.0
+	env.volumetric_fog_anisotropy = 0.6   # mirando hacia la puerta, el haz brilla mas (dispersion hacia delante)
+	env.volumetric_fog_length = 20.0   # corta: celdas mas finas, el haz sale mas definido (solo hace falta dentro del hogar)
+	env.volumetric_fog_detail_spread = 1.5
+	env.volumetric_fog_temporal_reprojection_amount = 0.85
 
 
 ## El relieve real de Vilcashuaman (Terreno): la plaza en el origen, +X este, -Z norte.
@@ -166,6 +188,8 @@ func capturar_recorrido(hora := 10.5, solo: PackedStringArray = []) -> String:
 
 func _process(dt: float) -> void:
 	super._process(dt)
+	if hogar != null:
+		cielo.environment.volumetric_fog_enabled = jugador.global_position.distance_to(hogar.centro) < Hogar.RADIO_NIEBLA
 	if _hora != null:
 		var h := cielo.current_time
 		_hora.text = "%02d:%02d  21 jun 1532, Vilcashuaman%s   ·   RePag/AvPag hora · Inicio amanecer · Fin pausa · L lluvia · F2 banco · F3 miradores" % [

@@ -174,6 +174,50 @@ void fragment() {
 }
 """
 
+## Tejido andino (mantas, la cama, la lliclla colgada): franjas a lo largo de UV.y (en metros) y, en las franjas anchas
+## (pallay), rombos escalonados. Rojo de cochinilla, amarillo de chilca, negro y blanco de lana sin tenir.
+const SHADER_MANTA := """
+shader_type spatial;
+render_mode cull_disabled;
+
+uniform vec3 rojo : source_color = vec3(0.55, 0.07, 0.06);
+uniform vec3 amarillo : source_color = vec3(0.78, 0.55, 0.12);
+uniform vec3 negro : source_color = vec3(0.07, 0.05, 0.05);
+uniform vec3 blanco : source_color = vec3(0.80, 0.74, 0.63);
+uniform vec3 verde : source_color = vec3(0.12, 0.30, 0.20);
+uniform float semilla = 0.0;
+
+float hash(float n) { return fract(sin(n * 12.9898 + semilla * 4.13) * 43758.5453); }
+
+void fragment() {
+	// Repeticion de 0,9 m: franja ancha de pallay (0,32), listas finas a los lados y fondo rojo.
+	float v = fract(UV.y / 0.9);
+	vec3 c = rojo;
+	if (v < 0.04 || (v > 0.47 && v < 0.51)) c = negro;
+	else if (v < 0.08 || (v > 0.43 && v < 0.47)) c = amarillo;
+	else if (v > 0.10 && v < 0.42) {
+		// Pallay: rombos escalonados (distancia de Manhattan pixelada en celdas de 2 cm) de colores que alternan.
+		float celda = floor(UV.x / 0.24);
+		vec2 q = vec2(fract(UV.x / 0.24) - 0.5, (v - 0.26) / 0.32 * 1.33);
+		q = floor(q * 12.0 + 0.5) / 12.0;
+		float d = abs(q.x) + abs(q.y);
+		float h = hash(celda + floor(UV.y / 0.9) * 7.0);
+		vec3 centro = h < 0.5 ? amarillo : verde;
+		c = negro;
+		if (d < 0.42) c = blanco;
+		if (d < 0.30) c = centro;
+		if (d < 0.12) c = rojo;
+	} else if (v > 0.55 && v < 0.58) c = blanco;
+	else if (v > 0.62 && v < 0.64) c = amarillo;
+	// Trama: hilos finos que dan textura y un poco de desgaste.
+	float hilo = 0.85 + 0.15 * sin(UV.x * 900.0) * sin(UV.y * 700.0);
+	ALBEDO = c * hilo;
+	ROUGHNESS = 1.0;
+	SPECULAR = 0.15;
+	SSS_STRENGTH = 0.2;
+}
+"""
+
 const ROCA := "res://assets/terreno/rock_face_03/rock_face_03_diff_1k.jpg"
 const TIERRA := "res://assets/terreno/dry_ground_rocks/dry_ground_rocks_diff_1k.jpg"
 
@@ -242,8 +286,29 @@ static func todos() -> Dictionary:
 	roca.vertex_color_use_as_albedo = true
 	roca.roughness = 0.95
 
+	var sh_manta := Shader.new()
+	sh_manta.code = SHADER_MANTA
+	var manta := ShaderMaterial.new()
+	manta.shader = sh_manta
+	var plano := func(color: Color, rugoso := 0.9) -> StandardMaterial3D:
+		var m := StandardMaterial3D.new()
+		m.albedo_color = color
+		m.roughness = rugoso
+		return m
+	var maiz: StandardMaterial3D = plano.call(Color(0.80, 0.52, 0.14), 0.7)
+	var hierba: StandardMaterial3D = plano.call(Color(0.33, 0.36, 0.17))
+	hierba.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var algodon: StandardMaterial3D = plano.call(Color(0.78, 0.72, 0.60))
+	var lana: StandardMaterial3D = plano.call(Color(0.50, 0.09, 0.07))
+	# Brasas del fogon: brillan solas (el glow las hace resplandecer).
+	var brasa: StandardMaterial3D = plano.call(Color(0.1, 0.03, 0.01))
+	brasa.emission_enabled = true
+	brasa.emission = Color(1.0, 0.38, 0.08)
+	brasa.emission_energy_multiplier = 3.0
+
 	_cache = {
 		"pirca": pirca, "silleria": silleria, "poligonal": poligonal, "ichu": ichu,
 		"tierra": tierra, "madera": madera, "ceramica": ceramica, "agua": agua, "roca": roca, "losa": losa,
+		"manta": manta, "maiz": maiz, "hierba": hierba, "algodon": algodon, "lana": lana, "brasa": brasa,
 	}
 	return _cache

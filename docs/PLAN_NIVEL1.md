@@ -47,7 +47,7 @@ Cada hito termina en PARADA, con capturas y números. No se sigue hasta el «sig
 | Hito | Qué | Estado |
 |---|---|---|
 | N0 | Escena del nivel. Sky3D con un día de 20 min y teclas para la hora. | Hecho (`38c39c3`) |
-| N1 | Relieve real, fondo en capas con niebla. | Hecho (`6e79cdd`). Pendiente: relieve más accidentado (pedido para después). |
+| N1 | Relieve real, fondo en capas con niebla. | Hecho (`6e79cdd`). Relieve quebrado y abras al sol: `9722f36` |
 | N2 | Vida en el suelo: ichu con viento, flores, arbustos, árboles y piedras. | Hecho (`41c5827`) |
 | N3 | Zona 1, el pueblo: kit modular inca, kanchas, kallankas, colcas, plazas, escondrijos, pozos, tejados por donde correr, sótano secreto. | Hecho: `codigo/pueblo.gd`, `kit_inca.gd`, `materiales_inca.gd` |
 | N4 | Parkour: agarrarse a cornisas, subir a pulso, saltar entre tejados, trepar. PARADA: alturas medidas. | Hecho: `herramientas/probar_parkour.gd` (bordes de 1,2 a 3,5 m, huecos de hasta 8 m) |
@@ -61,6 +61,9 @@ Después del nivel:
 |---|---|
 | Lluvia | Hecha: `codigo/lluvia.gd` (tecla L) |
 | Brazos normales → oro | Hecho: `Manos.despertar_oro()` (tecla B) |
+| Relieve más accidentado (también en la zona jugable), con un abra donde se pone el sol | Hecho: `hornear_relieve.gd` (×1,4 cerca, ×2,6 lejos, riscos, `ABRAS`) |
+| Horizonte, nubes y valle de las fotos de referencia | Hecho: cúmulos grandes de vientre gris, chacras en el valle, cordillera con brecha a la puesta |
+| El hogar del Chasqui (morada cálida con el sol entrando por la puerta) | Hecho: `codigo/hogar.gd`, prueba `herramientas/probar_hogar.gd` |
 | Portar `core/` (españoles, combate, diálogos…) | Pendiente: falta el repo `chasqui-code` |
 
 ## Verificación
@@ -82,7 +85,7 @@ Después del nivel:
 
 ## Notas de N5 a N7 para quien siga
 
-- **Orden en `nivel1.gd`:** terreno → pueblo → cordillera → templo → camino (acaba en `templo.entrada`) → vegetación → lluvia.
+- **Orden en `nivel1.gd`:** terreno → pueblo → hogar → cordillera → templo → camino (acaba en `templo.entrada`) → vegetación → lluvia. El hogar pinta su suelo de obra, así que va antes de la vegetación.
 - **Huecos del terreno:** `Terreno.abrir_hueco(x, z, radio, radio_colision)`. El dibujo se descarta en el shader (16 huecos como máximo). La colisión lleva NaN en el `HeightMapShape3D` y solo funciona bien con **Jolt** (el proyecto ya lo usa). La pieza de dentro debe tapar el borde: la losa del pozo, y el faldón de colisión y las rocas en la boca de la cueva.
 - **El pozo del despertar:** `Camino.POZO`, de 15 m. El fondo es `Camino.despertar` (un `Marker3D`), y la salida es la cueva (`Camino.CUEVA`).
 - **Atajos:** se eligen solos (`Camino._atajos`): pares de puntos del camino a ≤ 60 m en línea recta, con 5 a 22 m de desnivel y más de 20 m de camino ahorrado.
@@ -94,5 +97,28 @@ Después del nivel:
 - **Pendiente:**
   - Medir FPS en la GPU por zona.
   - Jugarlo en local.
-  - El relieve más accidentado de N1.
   - Portar `core/` (españoles), que requiere el repo `chasqui-code`.
+
+## Notas del relieve quebrado y el hogar para quien siga
+
+- **Relieve:** `herramientas/hornear_relieve.gd` rehornea `assets/relieve/vilcas_cerca.res` y `vilcas_lejos.res`. Todo lo construido (pueblo, hogar, camino, templo) se asienta solo sobre `Terreno.altura()`. Si se cambia la exageración, hay que volver a correr `probar_camino.gd`, `probar_parkour.gd` y `probar_hogar.gd`.
+- **Abras:** `ABRAS` = [centro, acimut, ancho en grados, desde m, hasta m, cuánto hunde]. Se comprueban con `herramientas/perfil_horizonte.gd`. La cordillera tiene su propia brecha (`Cordillera.ACIMUT_PUESTA`). No da sombra (`cast_shadow` apagado), pero sí tapa el disco del sol.
+- **Sol del 21 de junio** (Sky3D, en el nivel):
+
+  | Hora | Acimut | Elevación |
+  |---|---|---|
+  | 16:30 | 298,7° | 13,5° |
+  | 16:45 | 297,5° | 10,3° |
+  | 17:00 | 296,3° | 7,1° |
+  | 17:15 | 295,3° | 3,8° |
+
+  Desde el hogar, el horizonte en el abra está a unos 5°.
+- **Hogar:**
+  - **Marco:** `Hogar._marco` tiene +z hacia la puesta, y `_casa` es el marco de la casa (el piso en y = 0).
+  - **Rayos:**
+    - Lo que se ve es `Hogar._actualizar_haz`: diez láminas aditivas desde el vano, en la dirección del sol (`Hogar.sol`, que pone `nivel1.gd`).
+    - La niebla volumétrica del `Environment` tiene densidad 0: solo la pone el `FogVolume` de la casa (0,08; más espesa enturbia el cuarto). `nivel1._process` la enciende a menos de `Hogar.RADIO_NIEBLA`.
+  - **Luz del sol en el interior:** a las 16:45 (10°) la luz entra casi por el eje pero rasante, y en el suelo deja poco. Por eso los miradores de dentro van a las 16:00 (20°).
+  - **Cerco:** sus muros miden 2,3 m. Un vano más alto que el muro deja geometría por encima del hueco, así que la portada (2,1 m) cabe dentro.
+- **Pruebas con rayos:** el borde de la zona jugable tiene muros invisibles (a ±596 m, `Terreno`). Un rayo físico hacia el sol choca con ellos, así que no sirve para saber si algo da sombra. Para eso hay que hacer capturas.
+
