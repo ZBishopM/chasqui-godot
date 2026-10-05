@@ -491,7 +491,7 @@ func _cueva() -> void:
 			terreno.abrir_hueco(c.x, c.z, 1.7, 2.6)   # la colision, mas ancha: la cubren el tunel y su faldon
 	# Luz: oscuro lejos de las bocas (la del pozo al principio y la de la ladera al final).
 	var luz := func(s: float) -> float:
-		return clampf(maxf(1.0 - absf(s - s_pozo) / 14.0, 1.0 - (fin - s) / 22.0), 0.1, 1.0)
+		return clampf(maxf(1.0 - absf(s - s_pozo) / 14.0, 1.0 - (fin - s) / 22.0), 0.17, 1.0)
 	for k in red.size() - 1:
 		var A: Array = red[k]
 		var B: Array = red[k + 1]
@@ -578,11 +578,15 @@ func _cueva() -> void:
 	cuerpo.add_child(cs)
 	add_child(cuerpo)
 	_info["tris_cueva"] = col.size() / 3
-	# Camara: donde despertara el Chasqui, con una luz tenue que baja por el pozo.
-	var c0: Vector3 = anillos[0][0]
+	# Camara: donde despertara el Chasqui (bajo el pozo), con una luz tenue que baja por el.
+	var k_pozo := 0
+	for k in anillos.size():
+		if absf((anillos[k][6] as float) - s_pozo) < absf((anillos[k_pozo][6] as float) - s_pozo):
+			k_pozo = k
+	var piso_pozo: float = anillos[k_pozo][4]
 	despertar = Marker3D.new()
 	despertar.name = "despertar_chasqui"
-	despertar.position = Vector3(c0.x, piso0, c0.z)
+	despertar.position = Vector3(POZO.x, piso_pozo, POZO.y)
 	add_child(despertar)
 	var luz_pozo := OmniLight3D.new()
 	luz_pozo.position = Vector3(POZO.x, piso0 + 3.5, POZO.y)
@@ -603,7 +607,7 @@ func _cueva() -> void:
 	_mirador("boca_cueva", ojo, cb)
 	var med: Array = anillos[anillos.size() / 2]
 	_mirador("cueva", (med[0] as Vector3) + Vector3(0, -0.2, 0) + (cf - (med[0] as Vector3)).normalized() * -2.0, cf)
-	_mirador("fondo_pozo", Vector3(c0.x + 2.0, piso0 + 1.6, c0.z + 1.0), Vector3(POZO.x, piso0 + 6.0, POZO.y))
+	_mirador("fondo_pozo", Vector3(POZO.x + 1.6, piso_pozo + 1.6, POZO.y + 0.8), Vector3(POZO.x, piso_pozo + 9.0, POZO.y))
 	_huellas.append([Vector2(cb.x, cb.z), Vector2(6, 6), 0.0, 1.0, 3.0])
 
 

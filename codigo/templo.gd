@@ -16,6 +16,7 @@ const PLATAFORMA := Rect2(-34.0, -30.0, 68.0, 64.0)
 const CIRCULO := Vector2(0.0, 16.0)            # centro de la plaza hundida (local)
 const GRADAS := [9.0, 10.2, 11.4, 12.6]        # radios: piso, grada 1, grada 2, borde
 const GRADA_ALTO := 0.8
+const LADOS := 48                             # lados de todos los circulos de la plaza (si no coinciden, quedan rendijas)
 const TEMPLO_Z := -15.0
 const TERRAZAS := [Vector3(30, 28, 3.5), Vector3(22, 16, 3.5), Vector3(14, 8, 2.6)]   # ancho x, fondo z, alto
 const USHNU := Vector2(22.0, 8.0)
@@ -86,12 +87,13 @@ func _plataforma(kit: KitInca) -> void:
 	kit.plataforma(_base, PLATAFORMA, rango.x - 0.6, _tapa, [r_c], {}, "poligonal")
 	_huellas.append([PLATAFORMA, 1.0, 3.0])
 	# Losa entre el cuadrado del hueco y el circulo del borde (sectores convexos).
-	var n := 48
+	var n := LADOS
 	var R: float = GRADAS[3]
 	var t := _base * Transform3D(Basis(), Vector3(CIRCULO.x, _tapa, CIRCULO.y))
+	var ao := -PI / LADOS   # el mismo giro que KitInca.anillo: las esquinas coinciden
 	for i in n:
-		var a0 := TAU * i / n
-		var a1 := TAU * (i + 1) / n
+		var a0 := ao + TAU * i / n
+		var a1 := ao + TAU * (i + 1) / n
 		var p0 := Vector3(cos(a0), 0, sin(a0))
 		var p1 := Vector3(cos(a1), 0, sin(a1))
 		var q0 := _al_cuadrado(p0, R)
@@ -122,22 +124,24 @@ func _plaza_hundida(kit: KitInca) -> void:
 	# Piso redondo
 	var pts := []
 	var uvs := []
-	for i in 40:
-		var a := TAU * i / 40.0
-		pts.append(Vector3(cos(a) * GRADAS[0], piso, sin(a) * GRADAS[0]))
+	var ao := -PI / LADOS   # el mismo giro que KitInca.anillo
+	for i in LADOS:
+		var a := ao + TAU * i / LADOS
+		pts.append(Vector3(cos(a) * (GRADAS[0] + 0.2), piso, sin(a) * (GRADAS[0] + 0.2)))
 		uvs.append(Vector2(cos(a), sin(a)) * GRADAS[0])
 	kit.cara("tierra", t, pts, uvs, Vector3.UP)
 	# Gradas: un muro redondo en cada radio y una corona de losas encima, hasta la tapa de la plataforma.
 	for k in 3:
 		var r: float = GRADAS[k]
 		var y0 := piso + GRADA_ALTO * k
-		kit.anillo("poligonal", t * Transform3D(Basis(), Vector3(0, piso - 0.3, 0)), r + 0.3, y0 - piso + GRADA_ALTO + 0.3, 0.6, 40, {}, 0.0)
+		# La coronacion queda 2 cm sobre la grada, que entra un poco por debajo: sin juntas.
+		kit.anillo("poligonal", t * Transform3D(Basis(), Vector3(0, piso - 0.3, 0)), r + 0.3, y0 - piso + GRADA_ALTO + 0.32, 0.6, LADOS, {}, 0.0)
 		var r2: float = GRADAS[k + 1]
-		for i in 40:
-			var a0 := TAU * i / 40.0
-			var a1 := TAU * (i + 1) / 40.0
+		for i in LADOS:
+			var a0 := ao + TAU * i / LADOS
+			var a1 := ao + TAU * (i + 1) / LADOS
 			var y := y0 + GRADA_ALTO
-			var c := [Vector3(cos(a0) * (r + 0.6), y, sin(a0) * (r + 0.6)), Vector3(cos(a1) * (r + 0.6), y, sin(a1) * (r + 0.6)),
+			var c := [Vector3(cos(a0) * (r + 0.45), y, sin(a0) * (r + 0.45)), Vector3(cos(a1) * (r + 0.45), y, sin(a1) * (r + 0.45)),
 				Vector3(cos(a1) * r2, y, sin(a1) * r2), Vector3(cos(a0) * r2, y, sin(a0) * r2)]
 			kit.cara("poligonal", t, c, [Vector2(c[0].x, c[0].z), Vector2(c[1].x, c[1].z), Vector2(c[2].x, c[2].z), Vector2(c[3].x, c[3].z)], Vector3.UP)
 	_mirador("plaza_circular", Vector3(CIRCULO.x + 9.5, _tapa + 1.6, CIRCULO.y + 9.5), Vector3(CIRCULO.x, piso, CIRCULO.y))
@@ -227,8 +231,8 @@ func _ushnu(kit: KitInca) -> void:
 	for s in [-0.45, 0.45]:
 		kit.caja("poligonal", ts, Vector3(s, 0.25, 0), Vector3(0.75, 0.5, 0.7))
 		kit.caja("poligonal", ts, Vector3(s, 0.65, 0.3), Vector3(0.75, 1.3, 0.12))
-	_mirador("ushnu", _l(USHNU.x - 16.0, _tapa + 1.6, USHNU.y + 6.0), _l(USHNU.x, y, USHNU.y))
-	_mirador("desde_ushnu", _l(USHNU.x + 2.2, y + 1.6, USHNU.y), _l(-10.0, _tapa, CIRCULO.y))
+	_mirador("ushnu", Vector3(USHNU.x - 16.0, _tapa + 1.6, USHNU.y - 6.0), Vector3(USHNU.x, y, USHNU.y))
+	_mirador("desde_ushnu", Vector3(USHNU.x + 2.2, y + 1.6, USHNU.y), Vector3(-10.0, _tapa, CIRCULO.y))
 
 
 # --- Utilidades -----------------------------------------------------------------------------------
