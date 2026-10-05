@@ -16,7 +16,10 @@ const AMANECER := 6.25         # hora a la que salta Inicio (el sol asoma hacia 
 var cielo: Sky3D
 var terreno: Terreno
 var pueblo: Pueblo
+var camino: Camino
+var templo: Templo
 var vegetacion: Vegetacion
+var miradores: Array[Dictionary] = []   # los de todas las zonas, en orden
 var _hora: Label
 var _mirador := -1
 
@@ -29,6 +32,18 @@ func _ready() -> void:
 	pueblo = Pueblo.new()
 	pueblo.terreno = terreno
 	add_child(pueblo)
+	add_child(Cordillera.new())   # el fondo: nevados de 21 a 38 km
+	# El templo antes que el camino: el camino acaba al pie de su escalinata.
+	templo = Templo.new()
+	templo.terreno = terreno
+	add_child(templo)
+	camino = Camino.new()
+	camino.terreno = terreno
+	camino.destino = Vector2(templo.entrada.x, templo.entrada.z)
+	add_child(camino)
+	miradores.append_array(pueblo.miradores)
+	miradores.append_array(camino.miradores)
+	miradores.append_array(templo.miradores)
 	vegetacion = Vegetacion.new()
 	vegetacion.terreno = terreno
 	vegetacion.jugador = jugador
@@ -96,21 +111,21 @@ func _unhandled_input(ev: InputEvent) -> void:
 		KEY_END:
 			cielo.game_time_enabled = not cielo.game_time_enabled
 		KEY_F3:
-			var n := pueblo.miradores.size()
+			var n := miradores.size()
 			_mirador = (_mirador + (-1 if (ev as InputEventKey).shift_pressed else 1) + n) % n
 			_ir_a_mirador(_mirador)
 
 
 ## Lleva al jugador al mirador i del pueblo, mirando hacia donde dice.
 func _ir_a_mirador(i: int) -> void:
-	var m: Dictionary = pueblo.miradores[i]
+	var m: Dictionary = miradores[i]
 	var pos: Vector3 = m.pos
 	var dir: Vector3 = (m.mira as Vector3) - pos
+	jugador.reiniciar()
 	jugador.global_position = pos - Vector3(0, Jugador.OJOS.x, 0)
-	jugador.velocity = Vector3.ZERO
 	jugador.rotation.y = atan2(-dir.x, -dir.z)
 	jugador.cabeza.rotation.x = atan2(dir.y, Vector2(dir.x, dir.z).length())
-	print("mirador %d/%d: %s" % [i + 1, pueblo.miradores.size(), m.nombre])
+	print("mirador %d/%d: %s" % [i + 1, miradores.size(), m.nombre])
 
 
 ## Recorrido del pueblo para la PARADA de N3 (lo usa el MCP via game_eval): pasa por cada mirador (o solo por los de
@@ -123,15 +138,16 @@ func capturar_recorrido(hora := 10.5, solo: PackedStringArray = []) -> String:
 	_hud.visible = false
 	jugador.set_physics_process(false)
 	var lineas: PackedStringArray = []
-	for i in pueblo.miradores.size():
-		if not solo.is_empty() and not solo.has(pueblo.miradores[i].nombre):
+	for i in miradores.size():
+		if not solo.is_empty() and not solo.has(miradores[i].nombre):
 			continue
 		_ir_a_mirador(i)
+		cielo.current_time = float(miradores[i].get("hora", hora))
 		await get_tree().create_timer(1.2).timeout   # que se asienten las sombras y el FPS
 		await RenderingServer.frame_post_draw
-		var ruta := _captura("pueblo_%02d_%s" % [i + 1, pueblo.miradores[i].nombre])
+		var ruta := _captura("nivel1_%02d_%s" % [i + 1, miradores[i].nombre])
 		lineas.append("%-14s %4d FPS  %7d primitivas  %4d dibujos  %s" % [
-			pueblo.miradores[i].nombre, Engine.get_frames_per_second(),
+			miradores[i].nombre, Engine.get_frames_per_second(),
 			RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME),
 			RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME), ruta])
 	jugador.set_physics_process(true)

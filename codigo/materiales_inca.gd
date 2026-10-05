@@ -7,6 +7,7 @@ extends RefCounted
 ##   silleria  bloques labrados en hiladas, juntas finas (kallanka, casas de los curacas)
 ##   ichu      techo de paja en hileras
 ##   tierra    suelo apisonado (plataformas, patios)
+##   roca      paredes de las cuevas (oscurecidas por el color de vertice)
 ##   madera, ceramica, agua
 
 const SHADER_PIEDRA := """
@@ -179,14 +180,14 @@ static func todos() -> Dictionary:
 		return _cache
 	var sh_piedra := Shader.new()
 	sh_piedra.code = SHADER_PIEDRA
-	var roca: Texture2D = load(ROCA)
+	var tex_roca: Texture2D = load(ROCA)
 	var pirca := ShaderMaterial.new()
 	pirca.shader = sh_piedra
-	pirca.set_shader_parameter("tex_roca", roca)
+	pirca.set_shader_parameter("tex_roca", tex_roca)
 	pirca.set_shader_parameter("modo", 0)
 	var silleria := ShaderMaterial.new()
 	silleria.shader = sh_piedra
-	silleria.set_shader_parameter("tex_roca", roca)
+	silleria.set_shader_parameter("tex_roca", tex_roca)
 	silleria.set_shader_parameter("modo", 1)
 	silleria.set_shader_parameter("color_piedra", Color(0.60, 0.56, 0.50))
 	silleria.set_shader_parameter("color_piedra2", Color(0.54, 0.50, 0.45))
@@ -219,8 +220,18 @@ static func todos() -> Dictionary:
 	agua.roughness = 0.05
 	agua.metallic_specular = 0.7
 
+	# Roca de las cuevas: la foto de roca proyectada, oscurecida por el color de vertice (luz que llega de las bocas).
+	var roca := StandardMaterial3D.new()
+	roca.albedo_texture = tex_roca
+	roca.albedo_color = Color(0.78, 0.7, 0.62)
+	roca.uv1_triplanar = true
+	roca.uv1_world_triplanar = true
+	roca.uv1_scale = Vector3.ONE / 2.5
+	roca.vertex_color_use_as_albedo = true
+	roca.roughness = 0.95
+
 	_cache = {
 		"pirca": pirca, "silleria": silleria, "poligonal": poligonal, "ichu": ichu,
-		"tierra": tierra, "madera": madera, "ceramica": ceramica, "agua": agua,
+		"tierra": tierra, "madera": madera, "ceramica": ceramica, "agua": agua, "roca": roca,
 	}
 	return _cache

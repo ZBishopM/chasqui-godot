@@ -241,6 +241,14 @@ func _subir() -> void:
 		_sin_agarre = 0.3)
 
 
+## Vuelve al estado normal (al teletransportarlo: miradores, pruebas), de pie y sin velocidad.
+func reiniciar() -> void:
+	estado = Estado.NORMAL
+	velocity = Vector3.ZERO
+	impulso = Vector3.ZERO
+	_sin_agarre = 0.3
+
+
 ## Si la capsula de `alto` m con los pies en `pies` choca con algo.
 func _choca_en(pies: Vector3, alto: float) -> bool:
 	var forma := CapsuleShape3D.new()

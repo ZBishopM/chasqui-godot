@@ -478,39 +478,16 @@ func _miradores_generales() -> void:
 
 # --- Suelo de obra --------------------------------------------------------------------------------
 
-## Pinta en una imagen de 1 m/px de la zona jugable donde hay obra (plataformas, casas, plaza, calles) y se la pasa al
-## terreno: ahi no crece ichu ni se reparten plantas, y el suelo es de tierra pisada.
+## Pasa al terreno donde hay obra (plataformas, casas, plaza, calles): ahi no crece ichu ni se reparten plantas, y el
+## suelo es de tierra pisada.
 func _marcar_obras() -> void:
-	var lado := 1200.0
-	var n := int(lado) + 1
-	var img := Image.create(n, n, false, Image.FORMAT_R8)
-	var datos := PackedByteArray()
-	datos.resize(n * n)
-	datos.fill(0)
 	# Todo el pueblo, calles incluidas: poco ichu, suelo pisado.
 	var todo := Rect2(-150.0, -96.0, 250.0, 190.0).merge(Rect2(-190.0, -45.0, 60.0, 100.0))
 	_huellas.push_front([todo, 0.8, 10.0])
-	var inv := _base.basis.inverse()
+	var lista := []
 	for hu: Array in _huellas:
 		var r: Rect2 = hu[0]
-		var valor: float = hu[1]
-		var margen: float = hu[2]
-		var centro := r.get_center()
-		var medio := r.size * 0.5
-		var cw := _mundo(centro.x, centro.y)
-		var radio := medio.length() + margen
-		var i0 := clampi(int(cw.x - radio + lado * 0.5), 0, n - 1)
-		var i1 := clampi(int(cw.x + radio + lado * 0.5) + 1, 0, n - 1)
-		var j0 := clampi(int(cw.z - radio + lado * 0.5), 0, n - 1)
-		var j1 := clampi(int(cw.z + radio + lado * 0.5) + 1, 0, n - 1)
-		for j in range(j0, j1 + 1):
-			for i in range(i0, i1 + 1):
-				var l := inv * Vector3(i - lado * 0.5 - cw.x, 0.0, j - lado * 0.5 - cw.z)
-				var d := maxf(absf(l.x) - medio.x, absf(l.z) - medio.y)
-				var v := valor * (1.0 - smoothstep(0.0, margen, d))
-				if v <= 0.0:
-					continue
-				var k := j * n + i
-				datos[k] = maxi(datos[k], int(v * 255.0))
-	img.set_data(n, n, false, Image.FORMAT_R8, datos)
-	terreno.poner_obras(img)
+		var c := r.get_center()
+		var w := _mundo(c.x, c.y)
+		lista.append([Vector2(w.x, w.z), r.size * 0.5, deg_to_rad(ROT), hu[1], hu[2]])
+	terreno.pintar_obras(lista)

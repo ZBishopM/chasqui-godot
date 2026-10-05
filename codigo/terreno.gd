@@ -37,6 +37,9 @@ uniform vec3 color_verde : source_color = vec3(0.33, 0.38, 0.22);
 uniform vec3 color_tierra : source_color = vec3(0.46, 0.37, 0.27);
 uniform vec3 color_roca : source_color = vec3(0.43, 0.40, 0.36);
 uniform float sombra_nubes = 0.35;  // cuanto oscurecen las sombras de las nubes que corren con el viento
+// Huecos (boca del pozo, entrada de la cueva): (x, z, radio). Ahi el suelo no se dibuja; la pieza que va dentro tapa el borde.
+uniform vec3 huecos[16];
+uniform int n_huecos = 0;
 
 varying vec3 v_pos;
 varying vec3 v_normal;
@@ -62,6 +65,11 @@ void vertex() {
 }
 
 void fragment() {
+	for (int i = 0; i < n_huecos; i++) {
+		if (distance(v_pos.xz, huecos[i].xy) < huecos[i].z) {
+			discard;
+		}
+	}
 	vec3 n = v_normal;
 	float pend = 1.0 - n.y;                                 // 0 llano, ~0.3 a 45 grados
 	float alt = v_pos.y;                                    // relativa a la plaza (3482 m)
@@ -126,6 +134,11 @@ var _tex_lejos: ImageTexture
 var _tex_cerca: ImageTexture
 var _tex_obras: ImageTexture
 var _mat: ShaderMaterial
+var _forma: HeightMapShape3D
+var _huecos := PackedVector3Array()       # (x, z, radio) que no se dibujan
+var _huecos_col := PackedVector3Array()   # (x, z, radio) que no chocan
+var _huecos_pendientes := false
+const MAX_HUECOS := 16
 var _m_por_px: Vector2
 var _centro_px: Vector2
 var _paso_cerca: float
@@ -175,12 +188,88 @@ func configurar(mat: ShaderMaterial) -> void:
 		mat.set_shader_parameter("paso_obras", _lado_cerca / (obras.get_width() - 1))
 
 
-## Marca el suelo de obra (Image FORMAT_R8 que cubre la zona jugable, 1 = obra): ahi no crece nada y el suelo es de
-## tierra. Hay que llamarlo antes de crear lo que se apoya en el terreno (Vegetacion).
-func poner_obras(img: Image) -> void:
-	obras = img
-	_tex_obras = ImageTexture.create_from_image(img)
+## Pinta suelo de obra (1 = obra: ahi no crece nada y el suelo es de tierra pisada) en una imagen de 1 m/px que cubre la
+## zona jugable. Cada huella: [centro (Vector2, mundo), semilados (Vector2), giro (rad, como Basis(UP, giro)), valor 0..1,
+## margen m (se desvanece hacia fuera)]. Se mezcla con lo ya pintado (maximo). Hay que llamarlo antes de crear lo que
+## se apoya en el terreno (Vegetacion).
+func pintar_obras(huellas: Array) -> void:
+	var n := int(_lado_cerca) + 1
+	if obras == null:
+		obras = Image.create(n, n, false, Image.FORMAT_R8)
+	var datos := obras.get_data()
+	var mitad := _lado_cerca * 0.5
+	for hu: Array in huellas:
+		var c: Vector2 = hu[0]
+		var medio: Vector2 = hu[1]
+		var giro: float = hu[2]
+		var valor: float = hu[3]
+		var margen: float = hu[4]
+		var ca := cos(giro)
+		var sa := sin(giro)
+		var radio := medio.length() + margen
+		var i0 := clampi(int(c.x - radio + mitad), 0, n - 1)
+		var i1 := clampi(int(c.x + radio + mitad) + 1, 0, n - 1)
+		var j0 := clampi(int(c.y - radio + mitad), 0, n - 1)
+		var j1 := clampi(int(c.y + radio + mitad) + 1, 0, n - 1)
+		for j in range(j0, j1 + 1):
+			for i in range(i0, i1 + 1):
+				var dx := i - mitad - c.x
+				var dz := j - mitad - c.y
+				# Al marco de la huella: inversa de Basis(UP, giro) en el plano.
+				var lx := dx * ca - dz * sa
+				var lz := dx * sa + dz * ca
+				var d := maxf(absf(lx) - medio.x, absf(lz) - medio.y)
+				var v := valor if d <= 0.0 else valor * (1.0 - smoothstep(0.0, maxf(margen, 0.01), d))
+				if v <= 0.0:
+					continue
+				var k := j * n + i
+				datos[k] = maxi(datos[k], int(v * 255.0))
+	obras.set_data(n, n, false, Image.FORMAT_R8, datos)
+	_tex_obras = ImageTexture.create_from_image(obras)
 	configurar(_mat)
+
+
+## Abre un hueco redondo en el suelo (x, z, radio): no se dibuja y no choca. `radio_colision` (por defecto 1 m menos que
+## el dibujo, porque la rejilla de colision es de 2 m) es lo que se abre en la colision: la pieza que va dentro (brocal,
+## boca de cueva) debe tapar el borde. Los huecos se aplican juntos al final del frame.
+func abrir_hueco(x: float, z: float, radio: float, radio_colision := -1.0) -> void:
+	if _huecos.size() >= MAX_HUECOS:
+		push_warning("Terreno: demasiados huecos")
+		return
+	_huecos.append(Vector3(x, z, radio))
+	_huecos_col.append(Vector3(x, z, radio_colision if radio_colision > 0.0 else maxf(radio - 1.0, 0.4)))
+	var lista := _huecos.duplicate()
+	lista.resize(MAX_HUECOS)
+	_mat.set_shader_parameter("huecos", lista)
+	_mat.set_shader_parameter("n_huecos", _huecos.size())
+	if not _huecos_pendientes:
+		_huecos_pendientes = true
+		_aplicar_huecos.call_deferred()
+
+
+func _aplicar_huecos() -> void:
+	_huecos_pendientes = false
+	var datos := cerca.get_data().to_float32_array()
+	var m := cerca.get_width()
+	var mitad := _lado_cerca * 0.5
+	for h in _huecos_col:
+		var i0 := clampi(int((h.x - h.z + mitad) / _paso_cerca), 0, m - 1)
+		var i1 := clampi(int((h.x + h.z + mitad) / _paso_cerca) + 1, 0, m - 1)
+		var j0 := clampi(int((h.y - h.z + mitad) / _paso_cerca), 0, m - 1)
+		var j1 := clampi(int((h.y + h.z + mitad) / _paso_cerca) + 1, 0, m - 1)
+		for j in range(j0, j1 + 1):
+			for i in range(i0, i1 + 1):
+				if Vector2(-mitad + i * _paso_cerca - h.x, -mitad + j * _paso_cerca - h.y).length() <= h.z:
+					datos[j * m + i] = NAN
+	_forma.map_data = datos
+
+
+## Si (x, z) cae en un hueco.
+func en_hueco(x: float, z: float) -> bool:
+	for h in _huecos:
+		if Vector2(x - h.x, z - h.y).length() < h.z:
+			return true
+	return false
 
 
 ## Cuanto suelo de obra hay en x, z (0..1).
@@ -275,6 +364,7 @@ func _colision() -> void:
 	var cuerpo := StaticBody3D.new()
 	add_child(cuerpo)
 	var forma := HeightMapShape3D.new()
+	_forma = forma
 	forma.map_width = cerca.get_width()
 	forma.map_depth = cerca.get_height()
 	forma.map_data = cerca.get_data().to_float32_array()
