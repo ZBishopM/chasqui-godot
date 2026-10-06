@@ -115,9 +115,9 @@ func rayo_ahora(cerca := false, donde := Vector3.INF) -> void:
 		pie = ojo + Vector3(cos(a) * dist, 900.0, sin(a) * dist)
 	else:
 		_dibujar(pie, dist, cerca)
-	_fogonazo(pie + Vector3(0, 600.0 if not nube else 0.0, 0), intensidad)
+	_fogonazo(pie + Vector3(0, 600.0 if not nube else 0.0, 0), intensidad, cerca)
 	if pantalla != null:
-		pantalla.flash(0.35 if cerca else (0.06 if nube else 0.15 * intensidad), 0.35 if cerca else 0.25)
+		pantalla.flash(0.2 if cerca else (0.06 if nube else 0.15 * intensidad), 0.35 if cerca else 0.25)
 	rayo.emit(intensidad, pie)
 
 
@@ -143,14 +143,17 @@ func _dibujar(pie: Vector3, dist: float, cerca: bool) -> void:
 
 
 ## La luz del rayo: 2-3 parpadeos desde `desde` hacia la camara.
-func _fogonazo(desde: Vector3, intensidad: float) -> void:
+## Los cercanos alumbran menos de lo que su intensidad diria: con toda la luz la fosa parecia de dia; asi el fogonazo
+## es un golpe azul frio con sombras duras.
+func _fogonazo(desde: Vector3, intensidad: float, cerca := false) -> void:
 	var ojo := camara.global_position if camara != null else Vector3.ZERO
 	var dir := (ojo - desde).normalized()
 	if absf(dir.y) > 0.99:
 		dir = Vector3(0.1, dir.y, 0.0).normalized()
 	_luz.basis = Basis.looking_at(dir, Vector3.UP)
 	_luz.visible = true
-	var e := 3.2 * intensidad
+	var e := 3.2 * intensidad * (0.6 if cerca else 1.0)
+	var amb := 0.5 if cerca else 0.9
 	var tw := create_tween()
 	for paso: Array in [[e, 0.03], [e * 0.15, 0.05], [e * 0.8, 0.04], [0.0, 0.08], [e * 0.45, 0.04], [0.0, 0.12]]:
 		tw.tween_property(_luz, "light_energy", float(paso[0]), float(paso[1]))
@@ -159,7 +162,7 @@ func _fogonazo(desde: Vector3, intensidad: float) -> void:
 	if cielo != null:
 		var env := cielo.environment
 		var ta := create_tween()
-		ta.tween_property(env, "ambient_light_energy", AMBIENTE + 0.9 * intensidad, 0.03)
-		ta.tween_property(env, "ambient_light_energy", AMBIENTE + 0.2 * intensidad, 0.08)
-		ta.tween_property(env, "ambient_light_energy", AMBIENTE + 0.6 * intensidad, 0.04)
+		ta.tween_property(env, "ambient_light_energy", AMBIENTE + amb * intensidad, 0.03)
+		ta.tween_property(env, "ambient_light_energy", AMBIENTE + amb * 0.2 * intensidad, 0.08)
+		ta.tween_property(env, "ambient_light_energy", AMBIENTE + amb * 0.65 * intensidad, 0.04)
 		ta.tween_property(env, "ambient_light_energy", AMBIENTE, 0.25)

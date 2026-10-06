@@ -87,6 +87,10 @@ func _malla_gota(tam: Vector2, alfa: float) -> QuadMesh:
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.albedo_color = Color(0.78, 0.82, 0.9, alfa)
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# Una gota que pasa rozando la camara se veia como una barra blanca enorme: se desvanece de 1,5 a 0,4 m.
+	m.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
+	m.distance_fade_min_distance = 0.4
+	m.distance_fade_max_distance = 1.5
 	q.material = m
 	return q
 

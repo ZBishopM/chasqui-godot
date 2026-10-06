@@ -24,6 +24,7 @@ const SUENO := Vector2(14.0, 18.0)
 const OJOS_ECHADO := 0.28   # m sobre el monton: la cabeza apoyada
 const OJOS_SENTADO := 0.85
 const HILOS := 8
+const HUESO_HILO := "f_middle.01"   # los hilos entran por los nudillos (en cuadro; la muneca queda abajo)
 
 const SHADER_VELO := """
 shader_type canvas_item;
@@ -155,8 +156,8 @@ func _poner(x: float) -> void:
 	var cab := 1.25 + sin(x * 0.9) * 0.03
 	cab = lerpf(cab, -0.5, _r(x, 5.5, 9.5))
 	cab = lerpf(cab, -0.3, _r(x, 10.0, 12.0))
-	cab = lerpf(cab, -0.78, _r(x, 18.0, 20.0))
-	cab = lerpf(cab, -0.62, _r(x, 30.0, 31.5))
+	cab = lerpf(cab, -0.85, _r(x, 18.0, 20.0))
+	cab = lerpf(cab, -0.72, _r(x, 30.0, 31.5))
 	cab = lerpf(cab, -0.08, _r(x, 34.5, 37.5))
 	_jugador.cabeza.rotation.x = cab
 	# Giro: mira a un lado y al otro buscando entre los cuerpos (9,5-14) y vuelve al frente.
@@ -164,10 +165,11 @@ func _poner(x: float) -> void:
 	_jugador.rotation.y = _yaw0 + giro
 	# Alabeo: la cabeza ladeada en el barro, que se endereza al incorporarse.
 	_jugador.camara.rotation.z = lerpf(0.22, 0.0, _r(x, 5.0, 8.0)) + sin(x * 0.7) * 0.01
-	# Manos: aparecen al incorporarse (aun sin venas); suben con las palmas arriba para recibir la sangre.
+	# Manos: aparecen al incorporarse (aun sin venas); suben con las palmas arriba para recibir la sangre y, cuando ha
+	# entrado, se dan la vuelta mientras se cierran: las venas (en el dorso y el antebrazo) quedan a la vista.
 	_manos.visible = x >= 7.0
 	var pose := _r(x, 18.2, 19.8) * (1.0 - _r(x, 34.5, 36.0))
-	var palmas := _r(x, 18.6, 20.2) * (1.0 - _r(x, 34.0, 35.6))
+	var palmas := _r(x, 18.6, 20.2) * (1.0 - _r(x, 26.5, 28.0))
 	var temblor := _r(x, 22.0, 29.0) * (1.0 - 0.7 * _r(x, PICO, PICO + 1.2)) * (1.0 - _r(x, 34.5, 35.5))
 	var apretar := _r(x, 27.5, 29.5) * (1.0 - _r(x, PICO, PICO + 0.15))
 	var venas := 0.9 * _r(x, 22.0, 29.0)
@@ -182,9 +184,10 @@ func _poner(x: float) -> void:
 		var ht := _hilo_t[i]
 		_hilos[i].poner_avance(clampf((x - ht.x) / ht.y, 0.0, 1.0))
 	# Pantalla: parpados (se abren, parpadean, se abren del todo), borroso al despertar, la luz de Inti.
-	var abierto := 0.45 * _r(x, 1.0, 2.2) * (1.0 - _r(x, 2.5, 2.8)) + _r(x, 3.0, 4.6)
+	# Pasado 1 la rendija sigue abriendose hasta salir de la pantalla (1,8): despierto no queda viñeta.
+	var abierto := 0.45 * _r(x, 1.0, 2.2) * (1.0 - _r(x, 2.5, 2.8)) + _r(x, 3.0, 4.6) + 0.8 * _r(x, 4.6, 6.5)
 	abierto *= 1.0 - 0.85 * (_r(x, 18.0, 18.12) - _r(x, 18.25, 18.5))   # un parpadeo al volver del sueño
-	_velo.set_shader_parameter("abierto", clampf(abierto, 0.0, 1.0))
+	_velo.set_shader_parameter("abierto", clampf(abierto, 0.0, 1.8))
 	_velo.set_shader_parameter("borroso", 1.0 - _r(x, 2.0, 6.5) + 0.6 * (_r(x, 17.0, 18.0) - _r(x, 18.0, 19.5)))
 	_velo.set_shader_parameter("inti", _sueno_inti(x))
 	var tam := get_viewport().get_visible_rect().size
@@ -201,10 +204,11 @@ func _sueno_inti(x: float) -> float:
 func _sucesos(a: float, b: float) -> void:
 	var cruza := func(x: float) -> bool: return a < x and b >= x
 	if cruza.call(3.6):
-		# Un rayo cruza el cielo que mira (hacia delante, lejos).
+		# Un rayo cruza el cielo que mira: cae a 250 m, algo de lado, y su cima (>= 500 m) queda a 60-70 grados de
+		# elevacion, dentro de lo que ve echado.
 		var ojo := _jugador.camara.global_position
-		var delante := Vector3(-sin(_yaw0), 0.0, -cos(_yaw0))
-		_tormenta.rayo_ahora(false, Vector3(ojo.x, ojo.y - 150.0, ojo.z) + delante * 420.0)
+		var rumbo := _yaw0 + 0.5
+		_tormenta.rayo_ahora(false, Vector3(ojo.x, ojo.y - 50.0, ojo.z) + Vector3(-sin(rumbo), 0.0, -cos(rumbo)) * 250.0)
 	if cruza.call(8.6):
 		_tormenta.rayo_ahora(true)
 	if cruza.call(12.2):
@@ -222,30 +226,34 @@ func _sucesos(a: float, b: float) -> void:
 		_tormenta._espera = 3.0
 
 
-## Los hilos: de los cuerpos mas cercanos (sus torsos) a una y otra muneca, saliendo escalonados.
+## Los hilos: de los cuerpos mas cercanos que tiene delante (sus torsos, a +-60 grados de donde mira: se los ve llegar)
+## a los nudillos de una y otra mano, saliendo escalonados; entran todos antes de que las manos se den la vuelta (26,5 s).
 func _soltar_hilos() -> void:
 	var yo := _fosa.despertar
+	var delante := Vector2(-sin(_jugador.rotation.y), -cos(_jugador.rotation.y))
 	var fuentes := _fosa.fuentes.duplicate()
 	fuentes.sort_custom(func(p: Vector3, q: Vector3) -> bool:
 		return Vector2(p.x - yo.x, p.z - yo.z).length() < Vector2(q.x - yo.x, q.z - yo.z).length())
 	var elegidas: Array[Vector3] = []
-	for f: Vector3 in fuentes:
-		var d := Vector2(f.x - yo.x, f.z - yo.z).length()
-		if d > 1.3 and d < 5.0:
-			elegidas.append(f)
-		if elegidas.size() >= HILOS:
-			break
+	for pasada in 2:   # primero las de delante; si no alcanzan, las demas
+		for f: Vector3 in fuentes:
+			var v := Vector2(f.x - yo.x, f.z - yo.z)
+			var de_frente := v.normalized().dot(delante) > cos(deg_to_rad(60.0))
+			if v.length() > 1.3 and v.length() < 5.0 and (de_frente or pasada == 1) and not elegidas.has(f):
+				elegidas.append(f)
+			if elegidas.size() >= HILOS:
+				break
 	var espacio := _jugador.get_world_3d().direct_space_state
 	var excluir: Array[RID] = [_jugador.get_rid()]
 	for i in elegidas.size():
 		var lado := ".L" if i % 2 == 0 else ".R"
-		var mano := _manos.punto_mano(lado)
+		var mano := _manos.punto_mano(lado, HUESO_HILO)
 		var hilo := HiloSangre.new()
 		hilo.largo_m = 1.0 + 0.15 * (i % 3)
-		hilo.armar(HiloSangre.recorrido_por(espacio, elegidas[i] + Vector3.UP * 0.6, mano, excluir, 77 + i), 0.011 + 0.002 * (i % 2))
+		hilo.armar(HiloSangre.recorrido_por(espacio, elegidas[i] + Vector3.UP * 0.6, mano, excluir, 77 + i), 0.019 + 0.004 * (i % 2))
 		nivel.add_child(hilo)
 		_hilos.append(hilo)
-		_hilo_t.append(Vector2(20.4 + 0.45 * i, 4.6 + 0.4 * (i % 3)))
+		_hilo_t.append(Vector2(20.4 + 0.3 * i, 3.6 + 0.3 * (i % 3)))
 
 
 func _terminar() -> void:

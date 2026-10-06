@@ -32,12 +32,12 @@ func _cinematica(saltar_en: float) -> String:
 		s += 1.0 / 60.0
 		if saltar_en > 0.0 and s >= saltar_en and not fin[0]:
 			c.saltar()
-		if hilos == "" and c != null and is_instance_valid(c) and c.t >= 27.0:
+		if hilos == "" and c != null and is_instance_valid(c) and c.t >= 26.3:
 			var lejos := 0.0
 			for h: HiloSangre in c._hilos:
 				var lado := ".L" if c._hilos.find(h) % 2 == 0 else ".R"
-				lejos = maxf(lejos, h.fin.distance_to(nivel.manos.punto_mano(lado)))
-			hilos = "%d hilos (de %.1f a %.1f m), entran a %.2f m de la muneca como mucho; mortajas con sangre %.2f" % [
+				lejos = maxf(lejos, h.fin.distance_to(nivel.manos.punto_mano(lado, CinematicaDespertar.HUESO_HILO)))
+			hilos = "%d hilos (de %.1f a %.1f m), entran a %.2f m de los nudillos como mucho; mortajas con sangre %.2f" % [
 				c._hilos.size(), _min_rec(c._hilos), _max_rec(c._hilos), lejos, float(nivel.fosa.cuerpos[0].get_instance_shader_parameter("sangre"))]
 	# Que caiga y se asiente sobre el monton.
 	for i in 60:

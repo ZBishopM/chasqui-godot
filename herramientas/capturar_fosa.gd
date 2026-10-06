@@ -5,7 +5,7 @@ extends SceneTree
 ## captura y captura no se dibuja (con Vulkan por software cada cuadro tarda segundos): solo los ultimos cuadros antes de
 ## cada una, para que se asienten las sombras.
 
-const MOMENTOS := [2.0, 3.65, 8.62, 11.0, 13.4, 16.0, 21.0, 23.5, 26.0, 28.5, 30.0, 31.2, 32.33, 33.2, 35.0, 37.8]
+const MOMENTOS := [2.0, 3.65, 6.8, 8.62, 11.0, 16.0, 21.5, 23.0, 24.5, 26.0, 27.8, 29.3, 30.8, 31.8, 32.33, 33.2, 35.0, 37.8]
 
 
 func _initialize() -> void:

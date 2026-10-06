@@ -25,12 +25,12 @@ void fragment() {
 	if (v_s > avance || v_s < avance - largo) {
 		discard;
 	}
-	// Sangre fresca: muy oscura y brillante (los rayos la hacen relucir); un rescoldo rojo apenas, que la deja leer de
-	// noche entre fogonazos.
+	// Sangre fresca: muy oscura y brillante (los rayos la hacen relucir), con un rescoldo rojo que corre hacia la mano y
+	// la deja leer de noche entre fogonazos (no es sangre cualquiera: la llama Inti).
 	ALBEDO = color_sangre;
 	ROUGHNESS = 0.12;
 	SPECULAR = 0.7;
-	EMISSION = vec3(0.45, 0.02, 0.015) * (0.06 + 0.05 * sin(v_s * 60.0 - TIME * 9.0));
+	EMISSION = vec3(0.5, 0.025, 0.02) * (0.2 + 0.08 * sin(v_s * 60.0 - TIME * 9.0));
 }
 """
 const LADOS := 7

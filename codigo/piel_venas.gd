@@ -168,11 +168,11 @@ void fragment() {
 	// Con el oro encendido la costra y el coagulo tinen la piel de encima, al mismo nivel que el oro.
 	ALBEDO = mix(ALBEDO, vec3(0.05, 0.03, 0.035), negro * 0.7 * vivo);
 	ALBEDO = mix(ALBEDO, color_coagulo * 0.55, coagulo * 0.5 * vivo);
-	// La sangre: la vena hinchada se ve granate bajo la piel (sin luz propia, apenas un rescoldo); donde paso el frente
+	// La sangre: la vena hinchada se ve granate bajo la piel, con un rescoldo que late (se lee de noche); donde paso el frente
 	// ya es oro.
 	ALBEDO = mix(ALBEDO, mix(ALBEDO, color_sangre, nucleo * 0.85 + halo * 0.2), v_sangre * smoothstep(0.05, 0.3, v_tam));
 	ROUGHNESS = mix(ROUGHNESS, 0.35, v_sangre * nucleo);
-	EMISSION = mix(oro * encendido * luz, color_sangre * nucleo * 0.25, v_sangre);
+	EMISSION = mix(oro * encendido * luz, color_sangre * nucleo * (0.45 + 0.3 * pulso(TIME)), v_sangre);
 }
 """
 

@@ -237,11 +237,12 @@ func reaccionar(k: float) -> void:
 	_reaccion = maxf(_reaccion, clampf(k, 0.0, 1.0) * smoothstep(0.1, 0.4, venas_base))
 
 
-## Posicion en el mundo de la muneca (`lado` ".L" o ".R"); la de las manos si el rig no tiene ese hueso.
-func punto_mano(lado: String) -> Vector3:
+## Posicion en el mundo del hueso `hueso` (por defecto la muneca) de la mano `lado` (".L" o ".R"); la de las manos si
+## el rig no tiene ese hueso.
+func punto_mano(lado: String, hueso := "hand") -> Vector3:
 	if _sk == null:
 		return global_position
-	var i := _sk.find_bone("hand" + lado)
+	var i := _sk.find_bone(hueso + lado)
 	return _sk.global_transform * _sk.get_bone_global_pose(i).origin if i >= 0 else global_position
 
 
