@@ -135,17 +135,40 @@ func _hoyo(kit: KitInca) -> void:
 		kit.cara("agua", t, cp, cu, Vector3.UP, false)
 
 
-## Piedras salientes del lado del camino para trepar (escalones de ~0,55 m) desde el fondo hasta el borde.
+## Piedras salientes para trepar: una escalera de caracol pegada a la pared que sube ~1/3 de vuelta hasta el borde del
+## lado del camino. Cada piedra sube ESCALON m (se salta: el salto llega a ~1,2 m); asoman ~1 m de la pared y no se
+## solapan (la de arriba no tapa la pisada de la de abajo).
+const ESCALON := 0.5
+const VUELTA := 3.4   # rad de pared que recorre la escalera (algo mas de media vuelta)
+var escalones: Array[Vector3] = []   # lo alto de cada piedra, de abajo arriba (mundo)
+
+
+## Radio de la pared a la altura `h` sobre el fondo (los anillos de _hoyo, sin el ruido), con el borde a `alto`.
+func _radio_pared(h: float, alto: float) -> float:
+	var f := clampf(h / alto, 0.0, 1.0)
+	var r := [RADIO, RADIO + (BORDE - RADIO) * 0.22, RADIO + (BORDE - RADIO) * 0.6, BORDE]
+	var fs := [0.0, 0.38, 0.8, 1.0]
+	for i in 3:
+		if f <= fs[i + 1]:
+			return lerpf(r[i], r[i + 1], (f - fs[i]) / (fs[i + 1] - fs[i]))
+	return BORDE
+
+
 func _escalones(kit: KitInca) -> void:
 	var dir := (CAMINO - CENTRO).normalized()
-	var a := atan2(dir.y, dir.x)
-	var b := Basis(Vector3.UP, -a)
-	var n := ceili((HONDO + 0.35) / 0.55)
+	var fin := atan2(dir.y, dir.x)
+	var alto_fin := _suelo(fin, BORDE) + 0.35 - _piso
+	var n := ceili(alto_fin / ESCALON)
 	for k in n:
-		var r := RADIO - 0.25 + k * (BORDE - RADIO + 0.1) / n
-		var c := CENTRO + dir * r
-		var alto := 0.55 * (k + 1)
-		kit.caja("pirca", Transform3D(b, Vector3(c.x, _piso, c.y)), Vector3(0, alto * 0.5, 0), Vector3(0.5, alto, 0.9))
+		var a := fin - VUELTA * (1.0 - float(k + 1) / n)
+		var arriba := alto_fin * (k + 1) / n
+		var r := _radio_pared(arriba, _suelo(a, BORDE) + 0.35 - _piso) - 0.3
+		var b := Basis(Vector3.UP, -a)
+		var c := CENTRO + Vector2(cos(a), sin(a)) * r
+		var grueso := minf(0.6, arriba)
+		# Losa: 1,4 m hacia dentro de la pared (asoma ~1 m aunque la pared se combe), 0,7 m a lo largo de ella.
+		kit.caja("pirca", Transform3D(b, Vector3(c.x, _piso + arriba - grueso, c.y)), Vector3(0, grueso * 0.5, 0), Vector3(1.4, grueso, 0.7), "", true)
+		escalones.append(Vector3(c.x - cos(a) * 0.3, _piso + arriba, c.y - sin(a) * 0.3))
 
 
 ## La pala de los traidores, clavada en el monton de tierra.

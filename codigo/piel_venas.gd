@@ -45,6 +45,10 @@ uniform float rugosidad = 0.62;
 // FOV propio de las manos (viewmodel FOV), en grados verticales; 0 = el de la camara. Asi el FOV del mundo puede abrirse
 // (esprint, patada del Halcon) sin que los antebrazos, tan cerca de la camara, se estiren hacia los bordes.
 uniform float fov_manos = 0.0;
+// Sangre en las venas (cinematica del despertar en la fosa): antes del oro las venas se llenan de la sangre de los
+// muertos, oscuras e hinchadas. El frente del poder (crecimiento) la vuelve oro desde los nudillos.
+uniform float sangre = 0.0;
+uniform vec3 color_sangre : source_color = vec3(0.30, 0.025, 0.03);
 
 varying float v_campo;   // distancia al eje / alcance del bulto (1 = fin del bulto)
 varying float v_r;       // distancia al eje de la vena / (3 * semiancho): 1 = lejos de toda vena
@@ -55,6 +59,7 @@ varying float v_encendido;
 varying float v_frente;
 varying float v_g;       // coordenada de crecimiento (0 nudillos .. 1 codo)
 varying vec3 v_aleja;    // direccion en la piel que se aleja de la vena (vista)
+varying float v_sangre;  // sangre que queda en este punto (por delante del frente de oro)
 
 // Bulto de piel sobre una vena: lomo redondo y falda larga y suave (la piel no se dobla en angulo). x: 0 eje, 1 fin.
 float perfil(float x) {
@@ -101,6 +106,7 @@ void vertex() {
 	v_encendido = detras * step(0.001, crec) * (del_poder ? brillo : brillo_otro);
 	float df = (COLOR.g - crec) * 14.0;   // sin pow(): la base es negativa detras del frente
 	v_frente = exp(-df * df) * step(0.001, crec);
+	v_sangre = sangre * (1.0 - detras * step(0.001, crec));
 	// Alto y ancho crecen con el tamaño; el ancho menos (por debajo de ~60 % la malla no tiene vertices para dibujarlo).
 	float ancho = grosor * (0.6 + 0.4 * v_tam);
 	float h = altura * 1.6 * COLOR.b * v_tam * (1.0 + latido * pulso(TIME));
@@ -162,7 +168,11 @@ void fragment() {
 	// Con el oro encendido la costra y el coagulo tinen la piel de encima, al mismo nivel que el oro.
 	ALBEDO = mix(ALBEDO, vec3(0.05, 0.03, 0.035), negro * 0.7 * vivo);
 	ALBEDO = mix(ALBEDO, color_coagulo * 0.55, coagulo * 0.5 * vivo);
-	EMISSION = oro * encendido * luz;
+	// La sangre: la vena hinchada se ve granate bajo la piel (sin luz propia, apenas un rescoldo); donde paso el frente
+	// ya es oro.
+	ALBEDO = mix(ALBEDO, mix(ALBEDO, color_sangre, nucleo * 0.85 + halo * 0.2), v_sangre * smoothstep(0.05, 0.3, v_tam));
+	ROUGHNESS = mix(ROUGHNESS, 0.35, v_sangre * nucleo);
+	EMISSION = mix(oro * encendido * luz, color_sangre * nucleo * 0.25, v_sangre);
 }
 """
 

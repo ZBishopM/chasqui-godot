@@ -3,7 +3,7 @@ extends "res://codigo/banco.gd"
 ## Hereda del banco las manos, los poderes, el HUD y el cambio de candidatos; cambia el entorno por un cielo con el sol y
 ## la luna donde estaban de verdad (Sky3D, latitud y fecha reales) y la arena por el escenario.
 ## Teclas extra: RePág / AvPág una hora mas / menos · Inicio salto al amanecer · Fin pausa el reloj · F2 vuelve al banco ·
-## F3 (Mayus+F3) siguiente (anterior) mirador · L lluvia · F5 tormenta.
+## F3 (Mayus+F3) siguiente (anterior) mirador · L lluvia · F5 tormenta · F4 despertar en la fosa (Esc o Intro la salta).
 
 const LATITUD := -13.653     # grados: Vilcashuaman
 const LONGITUD := -73.953
@@ -24,6 +24,7 @@ var templo: Templo
 var vegetacion: Vegetacion
 var lluvia: Lluvia
 var tormenta: Tormenta
+var cinematica: CinematicaDespertar
 var miradores: Array[Dictionary] = []   # los de todas las zonas, en orden
 var _hora: Label
 var _mirador := -1
@@ -78,6 +79,7 @@ func _ready() -> void:
 	tormenta.camara = jugador.camara
 	tormenta.terreno = terreno
 	add_child(tormenta)
+	tormenta.rayo.connect(func(i: float, _donde: Vector3) -> void: manos.reaccionar(i))   # las venas de oro responden
 	_hora = Label.new()
 	_hora.position = Vector2(16, 300)
 	_hora.add_theme_font_size_override("font_size", 18)
@@ -162,10 +164,23 @@ func _unhandled_input(ev: InputEvent) -> void:
 				tormenta.parar()
 			else:
 				tormenta.empezar("normal", false)
+		KEY_F4:
+			despertar_en_fosa()
 		KEY_F3:
 			var n := miradores.size()
 			_mirador = (_mirador + (-1 if (ev as InputEventKey).shift_pressed else 1) + n) % n
 			_ir_a_mirador(_mirador)
+
+
+## El despertar en la fosa comun (CinematicaDespertar): noche de tormenta, la sangre de los muertos y las venas de oro.
+func despertar_en_fosa() -> CinematicaDespertar:
+	if cinematica != null:
+		return cinematica
+	cinematica = CinematicaDespertar.new()
+	cinematica.nivel = self
+	cinematica.terminada.connect(func() -> void: cinematica = null)
+	add_child(cinematica)
+	return cinematica
 
 
 ## Miradores hacia los nevados (Cordillera.MACIZOS): desde lo alto del templo hacia Vilcabamba (ENE), con luz de tarde
@@ -233,6 +248,6 @@ func _process(dt: float) -> void:
 		cielo.environment.volumetric_fog_enabled = jugador.global_position.distance_to(hogar.centro) < Hogar.RADIO_NIEBLA
 	if _hora != null:
 		var h := cielo.current_time
-		_hora.text = "%02d:%02d  21 jun 1532, Vilcashuaman%s   ·   RePag/AvPag hora · Inicio amanecer · Fin pausa · L lluvia · F5 tormenta · F2 banco · F3 miradores" % [
+		_hora.text = "%02d:%02d  21 jun 1532, Vilcashuaman%s   ·   RePag/AvPag hora · Inicio amanecer · Fin pausa · L lluvia · F5 tormenta · F4 fosa · F2 banco · F3 miradores" % [
 			int(h), int(fmod(h, 1.0) * 60.0), "" if cielo.game_time_enabled else " (pausa)"]
 		_hora.visible = _hud.visible
