@@ -7,7 +7,7 @@ extends Node3D
 ## despierta el Chasqui entre los muertos amortajados; su sangre le da las venas de oro.
 ##
 ## Un hoyo de ~10 m y 5,2 m de hondo con paredes de tierra removida, montones de la tierra sacada alrededor, barro y
-## charcos, piedras para trepar por el lado del camino y una pala olvidada. Lleno: tres capas de cuerpos envueltos en
+## charcos, una escalera de caracol de piedras salientes para trepar (acaba del lado del camino) y una pala olvidada. Lleno: tres capas de cuerpos envueltos en
 ## mantas tejidas atadas con sogas (MaterialesInca "mortaja", cada una de otro tinte), echados en poses distintas; bajo
 ## los de abajo, charcos de sangre (Decal). La sangre baja con `secar_sangre()` durante la cinematica.
 

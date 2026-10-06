@@ -64,6 +64,12 @@ Después del nivel:
 | Relieve más accidentado (también en la zona jugable), con un abra donde se pone el sol | Hecho: `hornear_relieve.gd` (×1,4 cerca, ×2,6 lejos, riscos, `ABRAS`) |
 | Horizonte, nubes y valle de las fotos de referencia | Hecho: cúmulos grandes de vientre gris, chacras en el valle, cordillera con brecha a la puesta |
 | El hogar del Chasqui (morada cálida con el sol entrando por la puerta) | Hecho: `codigo/hogar.gd`, prueba `herramientas/probar_hogar.gd` |
+| Nevados creíbles: nieve solo por encima de la cota real, alturas variadas, lo bajo pelado o con plantas | Hecho (`40d8616`): `codigo/biomas_andinos.gdshaderinc`, `cordillera.gd` con los macizos reales |
+| Cañón de ~500 m con río junto al Qhapaq Ñan (se ve, no se cae) | Hecho (`e8ba8db`): `codigo/canon.gd`, tallado en `hornear_relieve.gd` |
+| Fosa común escondida en el filo del cañón, llena de amortajados | Hecho (`e8ba8db`, escalera `ecbd9d0`): `codigo/fosa.gd`, 144 ragdolls horneados (`hornear_fosa.gd`) |
+| Tormenta con rayos (más seguidos en la cinemática, realistas después) | Hecho (`091592e`): `codigo/tormenta.gd` (F5) |
+| Cinemática del despertar en la fosa: sangre de los muertos → venas de oro | Hecha y aprobada (`ecbd9d0`, `48acee9`): `codigo/cinematica_despertar.gd` (F4), `sangre.gd`, `Manos.guion()`; detalles abiertos en las notas de abajo |
+| Diálogo con Inti en el sueño | Pendiente: gancho `CinematicaDespertar._sueno_inti` (14–18 s) |
 | Portar `core/` (españoles, combate, diálogos…) | Pendiente: falta el repo `chasqui-code` |
 
 ## Verificación
@@ -122,3 +128,41 @@ Después del nivel:
   - **Cerco:** sus muros miden 2,3 m. Un vano más alto que el muro deja geometría por encima del hueco, así que la portada (2,1 m) cabe dentro.
 - **Pruebas con rayos:** el borde de la zona jugable tiene muros invisibles (a ±596 m, `Terreno`). Un rayo físico hacia el sol choca con ellos, así que no sirve para saber si algo da sombra. Para eso hay que hacer capturas.
 
+## Notas de nevados, cañón, fosa y cinemática para quien siga
+
+- **Altitud real:** `bio_msnm(p) = 3482 + y / bio_exageracion(r)`, donde la exageración va de ×1,4 a ×2,6 entre 700 y 6000 m de la plaza (la de `hornear_relieve.gd`). Si cambia la exageración del relieve, hay que cambiarla también en `biomas_andinos.gdshaderinc` y en `Cordillera.EXAGERACION`.
+- **Fuentes de la nieve y los pisos:**
+  - línea de nieve de 4700 m (este húmedo) a 5100 m (oeste seco) en el Perú central;
+  - ELA tropical por encima de 5000 m, con lenguas hasta ~4600 m;
+  - Polylepis de 3500 a 4800 m;
+  - puna húmeda central.
+  - Fuentes:
+    - [Línea de nieve en los Andes peruanos (J. Glaciology)](https://www.cambridge.org/core/journals/journal-of-glaciology/article/observations-on-the-snow-line-in-the-peruvian-andes/612B481F59DB84DC31B416AE304C710E)
+    - [ELA de glaciares tropicales (Frontiers)](https://www.frontiersin.org/journals/earth-science/articles/10.3389/feart.2022.838826/full)
+    - [Puna húmeda de los Andes centrales](https://www.oneearth.org/ecoregions/central-andean-wet-puna/)
+    - [Polylepis en el Perú](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12655902/)
+    - [Ccarhuarazo](https://en.wikipedia.org/wiki/Ccarhuarazo_(Ayacucho))
+    - [Pumasillo](https://en.wikipedia.org/wiki/Pumasillo)
+- **Cañón:**
+  - El eje (`Canon.EJE`) se trazó desde un borde norte a ≥ 52 m en perpendicular de la calzada.
+  - `Canon.tallar` usa una rejilla de celdas de 100 m. Ojo en GDScript: los `Packed*Array` que se sacan de un `Dictionary` son copias, así que hay que volver a guardarlos.
+  - Si se toca el cañón: rehornear el relieve y volver a correr `probar_camino`, `probar_hogar` y `probar_parkour`.
+- **Fosa:**
+  - **Sitio:** (191, 160), oculto desde la calzada (0 de 43 puntos del camino la ven).
+  - **Si cambian el hoyo o los escalones:** rehornear el montón (`hornear_fosa.gd -- 144`, ~10 s, determinista) y comprobar que dice «0 segmentos fuera del hoyo».
+  - **Capa de render:** los cuerpos van en la capa 2 (`Fosa.CAPA_CUERPOS`) para que los charcos (`Decal`, `cull_mask` 1) no los pinten.
+- **Tormenta:**
+  - `Sky3D` vuelve a poner su `ambient_light_sky_contribution` con un tween al cruzar a la noche. Por eso la tormenta baja `night_sky_contribution` en vez de tocar el `Environment` directamente.
+  - Con `parar()` vuelven la hora, el reloj, la luna y el ambiente que había.
+- **Cinemática:**
+  - **Prioridad:** `process_priority` 100, para correr después del `Jugador`, que pone la altura de la cabeza cada cuadro.
+  - **Orden en cada cuadro:** primero `_poner(t)` y luego los sucesos. Si no, los hilos se trazaban con la cabeza aún de pie y quedaban 0,75 m por encima de la mano.
+  - **Los hilos no siguen a la mano:** su final queda fijo donde estaban los nudillos al salir (20,4 s). Funciona porque las manos están quietas hasta que se dan la vuelta (26,5 s), y para entonces ya han entrado todos.
+  - **Tiras de cuadros:** `capturar_fosa.gd` solo dibuja los cuadros justo antes de cada captura (`RenderingServer.render_loop_enabled`). Con Vulkan por software, dibujarlos todos tardaba ~5 h; así, unos 40 min.
+- **Abierto (aprobado así, para revisar):**
+  - **Cuadro del pico (32,3 s):** el rayo cercano y el destello aún lo hacen parecer de día durante ~0,1 s. Se podría bajar más la luz del rayo en ese instante y dejar que brille solo el oro.
+  - **Encuadre de las manos:** del puño en adelante (27–35 s) quedan en los bordes de la pantalla. Se podrían juntar hacia el centro con la pose del guion.
+  - **Rayo de los 3,6 s:** apenas se ve; se ve el fogonazo, pero el trazo cae en el borde borroso de los párpados.
+  - **Gotas al entrar:** los hilos no sueltan gotitas al entrar en la mano.
+  - **Trueno:** no hay; el proyecto aún no tiene audio.
+  - **FPS en la GPU:** sin medir. La fosa suma 144 mallas de ~1000 vértices y 864 cápsulas estáticas, y carga en ~1 s.

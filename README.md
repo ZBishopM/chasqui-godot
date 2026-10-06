@@ -37,6 +37,8 @@ El editor y la demo que lanza Claude (por el MCP de Godot) **conviven**: son dos
 | `RePág` / `AvPág` · `Inicio` · `Fin` | (nivel) una hora más / menos · salta al amanecer · pausa el reloj |
 | `F3` (Mayús: atrás) | (nivel) siguiente mirador: pueblo, camino, pozo, cueva, templo, amanecer… |
 | `L` | (nivel) lluvia: empieza o para (tarda unos segundos; el suelo se moja y se seca despacio) |
+| `F5` | (nivel) tormenta nocturna con rayos: empieza o para (vuelve a la hora que había) |
+| `F4` | (nivel) cinemática del despertar en la fosa común (38 s; `Esc` o `Intro` la saltan) |
 | `B` | brazos normales; otra vez: el despertar del oro (de brazos normales a brazos que contienen el oro) |
 | `W` / `Espacio` · `A`/`D` · `S`/`Ctrl` | (colgado de una cornisa) subir a pulso · desplazarse · soltarse (`S` + `Espacio`: salto atrás) |
 
@@ -129,6 +131,8 @@ Las venas son bultos de la propia piel, no mallas encima: abultan el antebrazo y
 - **El shader** (`codigo/piel_venas.gd`, `PielVenas`) empuja la piel por la normal con un perfil de bulto, inclina la normal para que la luz dibuje el relieve y enciende el oro: núcleo dorado y halo rojizo, como luz que atraviesa la carne.
 - **Oro en bruto e infectado:** la vena es oro sucio (ocre) con pepitas de oro más puro. Cuando arde, lleva dentro, como lava viva, costras negras que derivan con el borde al rojo y coágulos rojos que se forman y se deshacen; en reposo la infección no se ve.
 - **Estados** (los mueve `Manos`): en reposo las venas tienen el tamaño `Manos.venas_base` (lo fija el juego: 0 sin poderes, 0,5 con poderes, sube hacia 1 con el Caos) y el oro solo late. Al usar un poder, un frente sube de los nudillos al codo con la curva de esfuerzo del gesto: por detrás las venas se hinchan al 100 % y el oro se enciende (`AnimProc.brillo_venas`, con su espasmo); luego vuelven a `venas_base`. El brazo sin poder acompaña al 30 %. `Manos.mana` (0–1) apaga el oro con el maná vacío.
+- **Guion** (`Manos.guion(d)` / `soltar_guion()`): para cinemáticas. Mientras hay guion, sus valores mandan sobre la pose y las venas: `pose`, `palmas` (supinación de los antebrazos, `CapasManos.palmas`), `temblor`, `apretar`, `venas_base`, `crecimiento`, `brillo` y `sangre` (las venas llenas de sangre oscura; el frente de oro la vuelve oro).
+- **Reacción** (`Manos.reaccionar(k)`): el oro se enciende hasta el codo y se retira en ~0,6 s, con un temblor leve. Lo llama cada rayo; servirá para los enemigos cercanos.
 - **Se tocan en vivo** (parámetros del material): `altura` (m), `grosor` (1 = Caos bajo, ~1,5 = Caos alto), `luz`, `luz_reposo`, `latido`, `color_oro`, `color_pepita`, `pepitas`, `pepitas_escala`, `infeccion`, `coagulos`, `color_coagulo`.
 
 Volver a hornear si cambia el modelo o el trazado (`SEMILLA` en `hornear_piel.gd` da otra red igual de verosímil):
@@ -175,9 +179,22 @@ Plan por hitos en `docs/PLAN_NIVEL1.md` (cada hito termina en PARADA con captura
   - **Templo de tres terrazas** de piedra poligonal con escalinata. Arriba está el **Inti Wasi**, con portada de doble jamba al oeste y puerta al este, al borde, frente al horizonte.
   - **Ushnu** con escalinata, portada de doble jamba y el sillón del Inca.
   - **Miradores:** `amanecer` (6:33) y `atardecer` (17:18) se capturan a su hora.
-- **El fondo** (`codigo/cordillera.gd`): un anillo de cordillera de 21 a 38 km, más allá del relieve real.
-  - Delante, picos en pan de azúcar como el Huayna Picchu; detrás, nevados más altos hacia el ENE, por donde sale el sol.
-  - Es geometría a distancias reales, así que da paralaje, y la niebla de Sky3D la azula.
+- **El fondo** (`codigo/cordillera.gd`): un anillo de cordillera de 21 a 38,5 km, más allá del relieve real (1440 × 56 vértices, una pieza, sin sombras).
+  - **Alturas en metros sobre el mar** (msnm), pasadas al mundo con la misma exageración que el relieve lejano (×2,6): `y = (msnm − 3482) × 2,6`.
+  - **Casi todo son cordones de 4000 a 4800 m sin nieve** (puna, pedregal y roca). Solo los macizos reales que pasan de ~5000 m, en su rumbo desde Vilcashuamán, llevan nieve y glaciares (`Cordillera.MACIZOS`):
+    - Vilcabamba (Pumasillo 5991 m y Salkantay 6271 m), por donde sale el sol del Inti Raymi;
+    - Ampay, Rasuwillka y Solimana;
+    - Ccarhuarazo, un volcán con casquete.
+  - Delante, panes de azúcar sin nieve, con queñuales y roca. Al oeste, la brecha de la puesta (293°).
+  - Miradores `nevados` (teleobjetivo a Vilcabamba, 15:00) y `volcanes` (hacia el sur, 11:00).
+- **Pisos ecológicos y nieve** (`codigo/biomas_andinos.gdshaderinc`, compartido por la cordillera y el relieve lejano de `terreno.gd`): el color sale de la altitud real.
+  - **Pisos:** valle con chacras (< 3300 m), matorral, puna de ichu pajizo (en junio) con bofedales en lo llano, queñuales en las quebradas (3500–4400 m), superpuna de pedregal y yareta (4600–4950 m).
+  - **Nieve desde ~4950 m:**
+    - 200 m más abajo en las caras al sur, que son las sombrías en el hemisferio sur;
+    - 150 m más arriba en las caras al norte y 100 m más arriba en la vertiente seca del oeste;
+    - lenguas de glaciar azulado con grietas hasta ~4650 m en los circos;
+    - las paredes de más de ~50° no la sostienen (vetas de roca).
+  - **Paleta:** está en sRGB y se pasa a lineal (`pow 2,2`). Sin eso las montañas lejanas salían pálidas.
 - **El hogar del Chasqui** (`codigo/hogar.gd`): una kancha pequeña sobre su terraza en el borde oeste del pueblo, más allá de las casas redondas.
   - **Orientación:** la puerta trapezoidal de la casa mira al ONO (294°), y por la tarde el sol entra por ella.
   - **Haz de sol:** láminas de luz aditiva que salen del vano en la dirección real del sol, con polvo flotando. Se recalculan con el sol y brillan según lo alineado que esté con la puerta, su altura y su fuerza, así que se apagan de mañana, de noche y con lluvia.
@@ -188,6 +205,38 @@ Plan por hitos en `docs/PLAN_NIVEL1.md` (cada hito termina en PARADA con captura
   - **Acceso y parkour:** se entra por una portada del cerco, con escalera desde fuera. Por los fardos de junto a la puerta se sube al alero y al techo.
   - **Miradores:** `hogar` (16:00, hacia la puerta y el haz), `rayo` (16:00, el cuarto junto a la cama), `umbral` (17:06, la puesta) y `patio_hogar` (16:30).
   - **Sombras del fogón:** solo las proyectan las piezas del hogar (`shadow_caster_mask`); si no, su mapa cúbico volvía a dibujar el terreno y el ichu y doblaba las primitivas.
+- **El cañón** (`codigo/canon.gd`): corre de este a oeste por el sur de la meseta, pegado al Qhapaq Ñan entre el pozo y el templo.
+  - **Medidas:** ~500–580 m de hondo y ~340 m de borde a borde. Arriba tiene paredes de roca casi verticales con repisas y estratos (`terreno.gd`); abajo, pedregal y un río con espuma.
+  - **Distancias al borde:** calzada ≥ 52 m, pueblo 113 m, templo 75 m y hogar 214 m.
+  - **Horneado:** se talla en el relieve (`Canon.tallar`, desde `herramientas/hornear_relieve.gd`).
+  - **Borde norte:** es un peligro a la vista, pero no se puede caer. Una barrera invisible lo cierra, disimulada con peñascos.
+- **La fosa común** (`codigo/fosa.gd`): escondida en el filo norte del cañón, a 15 m del vacío y a ~100 m de la calzada, que no la ve. Se baja por un sendero de cabras.
+  - **Hoyo:** ~10 m de ancho y 5,2 m de hondo, con paredes de tierra removida, la tierra sacada amontonada alrededor, barro, charcos y la pala de los traidores.
+  - **144 amortajados:** bultos envueltos torpemente en mantas de colores (material `mortaja`, cuatro tintes) atados con sogas. Hacen un montón de ~1,6 m, en dos y tres capas.
+  - **Cómo se hacen los cuerpos:** cada bulto es un ragdoll de seis cápsulas que `herramientas/hornear_fosa.gd` deja caer con Jolt. Las poses quedan guardadas en `assets/fosa/cuerpos_fosa.json` y la malla del bulto se arma encima al cargar (~1 s).
+  - **Sangre:** charcos (`Decal`) y manchas en las mortajas; `secar_sangre()` las quita.
+  - **Salir:** una escalera de caracol de 16 piedras salientes (`Fosa.escalones`), de 0,5 m cada una, que se suben saltando.
+  - **Mirador:** `fosa`.
+- **Tormenta** (`codigo/tormenta.gd`, tecla `F5`): noche a la 1:30 con la luna tapada, lluvia al máximo y un ambiente azul gris muy bajo, para que se lean las formas entre rayo y rayo.
+  - **Modo `"cinematica"`:** un rayo cada 2–5 s, más cercanos.
+  - **Modo `"normal"`:** un rayo cada 8–25 s, el 70 % dentro de las nubes (el cielo parpadea) y alguno ramificado a 2–6 km.
+  - **Cada rayo:** 2–3 fogonazos de una luz direccional desde donde cae, con sombras duras, y un golpe de ambiente. Los cercanos suman un destello de pantalla.
+  - **Rayo visible:** `VfxPropios._bolt`, generalizado.
+  - **`signal rayo`:** las venas de oro reaccionan a cada uno (`Manos.reaccionar`).
+  - **Sin trueno:** el proyecto aún no tiene audio.
+- **El despertar en la fosa** (`codigo/cinematica_despertar.gd`, tecla `F4`, `nivel1.despertar_en_fosa()`): 38 s guionados con la tormenta en modo cinemática. Todo es función del reloj (`_poner(t)`), y los sucesos (rayos, hilos, pico) se disparan al cruzar su instante. `Esc` o `Intro` la saltan y dejan el mismo estado final.
+
+  | Seg. | Qué pasa |
+  |---|---|
+  | 0–6 | Párpados que se abren sobre la vista borrosa; boca arriba en el montón, mirando el cielo de tormenta. |
+  | 6–14 | Se incorpora; los fogonazos le muestran los cuerpos. Brazos normales. |
+  | 14–18 | Sueño de Inti: una luz cálida con un sol difuso (`_sueno_inti`, el gancho para el diálogo, que se hará después). |
+  | 18–27 | Levanta las manos con las palmas hacia arriba. Ocho hilos de sangre (`codigo/sangre.gd`, `HiloSangre`) reptan desde los cuerpos de delante por encima del montón y entran por los nudillos; las mortajas se secan. |
+  | 27–30 | Las manos se dan la vuelta y se cierran en puño; las venas del dorso se hinchan de sangre (granate con un rescoldo que late). |
+  | 30–32,3 | Un frente de oro sube de los nudillos al codo y convierte la sangre en oro. |
+  | 32,3 | Pico: rayo cercano, destello, patada de FOV y las manos se abren. |
+  | 33–38 | Quedan las venas de oro de reposo (`venas_base` 0,5); se pone de pie, recupera el control y la tormenta pasa a modo normal. |
+
 - **Lluvia** (`codigo/lluvia.gd`, tecla `L`):
   - **Gotas:** partículas GPU que siguen a la cámara con el viento del valle. Chocan con un campo de alturas que también la sigue (no llueve bajo techo ni en la cueva) y salpican.
   - **Cielo:** se cubre, el sol pierde fuerza y la bruma se espesa.
@@ -208,7 +257,19 @@ godot.console.exe --path . --script res://herramientas/recorrido_pueblo.gd -- 15
 godot.console.exe --path . --fixed-fps 20 --script res://herramientas/capturar_despertar.gd               # tira del despertar del oro
 godot.console.exe --headless --path . --fixed-fps 60 --script res://herramientas/probar_camino.gd        # recorre camino, templo, pozo y cueva
 godot.console.exe --headless --path . --fixed-fps 60 --script res://herramientas/probar_hogar.gd         # entra al hogar y sube a su techo
+godot.console.exe --headless --path . --fixed-fps 60 --script res://herramientas/probar_fosa.gd          # cinematica entera, saltada, y salir de la fosa
+godot.console.exe --path . --fixed-fps 60 --resolution 960x540 --script res://herramientas/capturar_fosa.gd   # tira de la cinematica (capturas/fosa_cine_*.png)
+godot.console.exe --path . --script res://herramientas/vistas_fosa.gd                                    # vistas fijas de la fosa y el cañon
+godot.console.exe --headless --path . --fixed-fps 60 --script res://herramientas/hornear_fosa.gd -- 144  # rehornea el monton (si cambia el hoyo o los escalones)
 ```
+
+`probar_fosa.gd`, último resultado:
+
+| Prueba | Resultado |
+|---|---|
+| Cinemática | Termina a los 38 s. Los 8 hilos (2,4–4,2 m) entran a 0,01 m de los nudillos. Al final: `venas_base` 0,5, guion suelto, control de vuelta, de pie sobre el montón, tormenta en modo normal. |
+| Saltada a los 20 s | Mismo estado final. |
+| Salir | Sube 14 piedras en 5 s y llega al sendero en 6 s más, sin atascos. |
 
 `probar_camino.gd` hace todo el recorrido manejando al jugador. Último resultado:
 
