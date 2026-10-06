@@ -192,20 +192,21 @@ static func _condor(ctx: Dictionary) -> void:
 	_reaccion(ctx.mundo, ctx.dummies, fin)
 
 
-static func _bolt(padre: Node3D, a: Vector3, b: Vector3, grosor: float, energia: float) -> void:
+## Rayo de a a b: tramos rectos (cajas emisivas) que se apartan de la linea hasta `desvio` m en el medio. Lo usan el
+## Condor (18 m) y la Tormenta (rayos de cientos de metros).
+static func _bolt(padre: Node3D, a: Vector3, b: Vector3, grosor: float, energia: float, desvio := 0.9, n := 12) -> void:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.albedo_color = Color(0.85, 0.93, 1.0)
 	mat.emission_enabled = true
 	mat.emission = Color(0.6, 0.8, 1.0)
 	mat.emission_energy_multiplier = 6.0 * energia
-	var n := 12
 	var anterior := a
 	for i in range(1, n + 1):
 		var t := float(i) / n
 		var p := a.lerp(b, t)
 		if i < n:
-			var tam := sin(PI * t) * 0.9
+			var tam := sin(PI * t) * desvio
 			p += Vector3(randf_range(-tam, tam), 0, randf_range(-tam, tam))
 		var largo := anterior.distance_to(p)
 		var seg := MeshInstance3D.new()
