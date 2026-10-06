@@ -17,6 +17,7 @@ const DEDOS := ["f_index", "f_middle", "f_ring", "f_pinky"]
 
 const BOMBEO_GRADOS := 9.0    # hombro adelante/atras al esprintar
 const CODO_GRADOS := 6.0      # cuanto se doblan de mas los codos al esprintar
+const PALMAS_GRADOS := 115.0  # supinacion del antebrazo con palmas = 1 (del reposo a la palma hacia arriba)
 ## Puno al esprintar: la pose de la mano (palma, dedos y pulgar) se copia del puno hecho a mano en un clip de gesto, en el
 ## instante en que mas cierra, y se mezcla con la animacion segun el esprint. Halcon cierra la izquierda; su derecha va
 ## abierta, asi que la derecha sale de Condor (mismo pack, ~250 grados de flexion por dedo en los dos).
@@ -25,6 +26,8 @@ const PUNO_CLIP := {".L": "halcon", ".R": "condor"}
 var giro_puno := 0.0     # grados que el antebrazo gira hacia pulgar arriba al esprintar (catalogo `giro_puno`)
 var en_reposo := false   # lo fija Manos: sin gesto, quieto y en el suelo
 var bombeo := 0.0        # 0..1, lo fija Manos con el esprint
+var apretar := 0.0       # 0..1, lo fija Manos: las dos manos se cierran en puno (despertar del oro)
+var palmas := 0.0        # 0..1, lo fija Manos (guion): los antebrazos giran hasta dejar las palmas hacia arriba
 var fase_paso := 0.0     # rad, lo fija Manos: un ciclo = dos pisadas
 var tic_actual := ""
 var _brazo := {}         # lado -> [brazo, antebrazo, mano, la mano cuelga aparte (H4)]
@@ -126,6 +129,12 @@ func _process_modification_with_delta(delta: float) -> void:
 	var sk := get_skeleton()
 	if bombeo > 0.001:
 		_bombear(sk)
+	if palmas > 0.001:
+		for k in LADOS.size():
+			_supinar(sk, LADOS[k], PALMAS_GRADOS * palmas * (-1.0 if k == 0 else 1.0))
+	if apretar > 0.001:
+		for s: String in LADOS:
+			_cerrar_puno(sk, s, apretar)
 	if tic_actual == "":
 		if en_reposo:
 			_espera -= delta
@@ -164,11 +173,27 @@ func _bombear(sk: Skeleton3D) -> void:
 		_girar(sk, b[0], Quaternion(eje, deg_to_rad(BOMBEO_GRADOS * bombeo * sin(fase_paso + PI * k))))
 		_girar(sk, b[1], Quaternion(eje, deg_to_rad(CODO_GRADOS * bombeo)))
 		if b[3]:
-			var g := sk.get_bone_global_pose(b[1]) * antebrazo_antes.affine_inverse() * mano_antes
-			var padre := sk.get_bone_parent(b[2])
-			var local := (sk.get_bone_global_pose(padre).affine_inverse() * g) if padre >= 0 else g
-			sk.set_bone_pose_position(b[2], local.origin)
-			sk.set_bone_pose_rotation(b[2], local.basis.get_rotation_quaternion())
+			_seguir_mano(sk, b, antebrazo_antes, mano_antes)
+
+
+## Gira el antebrazo `s` sobre su eje `grados` (positivo hacia pulgar arriba en el brazo derecho); la mano lo sigue.
+func _supinar(sk: Skeleton3D, s: String, grados: float) -> void:
+	var b: Array = _brazo[s]
+	var antebrazo_antes := sk.get_bone_global_pose(b[1])
+	var mano_antes := sk.get_bone_global_pose(b[2])
+	var largo := (mano_antes.origin - antebrazo_antes.origin).normalized()
+	_girar(sk, b[1], Quaternion(largo, deg_to_rad(grados)))
+	if b[3]:
+		_seguir_mano(sk, b, antebrazo_antes, mano_antes)
+
+
+## En H4 la mano cuelga de un control de IK: tras mover el antebrazo se la lleva con el.
+func _seguir_mano(sk: Skeleton3D, b: Array, antebrazo_antes: Transform3D, mano_antes: Transform3D) -> void:
+	var g := sk.get_bone_global_pose(b[1]) * antebrazo_antes.affine_inverse() * mano_antes
+	var padre := sk.get_bone_parent(b[2])
+	var local := (sk.get_bone_global_pose(padre).affine_inverse() * g) if padre >= 0 else g
+	sk.set_bone_pose_position(b[2], local.origin)
+	sk.set_bone_pose_rotation(b[2], local.basis.get_rotation_quaternion())
 
 
 ## Mezcla la mano `s` hacia su puno con peso `w` (0 = como venga de la animacion, 1 = el puno del clip).

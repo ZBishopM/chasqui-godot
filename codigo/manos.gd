@@ -76,6 +76,22 @@ var _peso_caida := 1.0   # 0..1: cuanto pesa el ultimo aterrizaje
 # Al agacharse la cabeza baja de golpe y las manos se quedan un instante arriba (al levantarse, abajo); el mismo resorte.
 const AGACHAR_GOLPE := 0.45      # m/s que recibe el resorte al agacharse o levantarse
 var _agachado := false
+# Despertar del oro (brazos normales -> brazos que contienen el oro): ver despertar_oro().
+signal pico_despertar                 # en el pico del despertar (el banco hace un destello)
+const DESPERTAR_SEG := 5.5
+var _despertar_t := -1.0              # s desde que empezo; -1 = no esta despertando
+var _despertar_base := 0.5            # venas_base al final
+# Guion (cinematica del despertar en la fosa): mientras no este vacio manda sobre la pose y las venas. Claves (todas
+# opcionales): pose 0..1 (manos frente a la cara), palmas 0..1 (hacia arriba), temblor 0..1, apretar 0..1 (puno),
+# venas_base, crecimiento 0..1 (frente en los dos brazos), brillo, sangre 0..1 (venas llenas de sangre).
+var _guion := {}
+# Reaccion de las venas de oro a algo de fuera (un rayo, un enemigo): un pico de brillo que se apaga en ~0,6 s.
+const REACCION_SEG := 0.6
+var _reaccion := 0.0
+# Colgado de una cornisa (Jugador.colgado): las manos suben al borde.
+const COLGADO_SUBIR := 0.24      # m
+const COLGADO_ADELANTE := 0.08   # m
+const COLGADO_CABECEO := 0.75    # rad: las munecas se giran hacia arriba
 
 
 func montar(e: Dictionary) -> void:
@@ -175,6 +191,92 @@ func _buscar_todos(n: Node, clase: String) -> Array[Node]:
 	for c in n.get_children():
 		r.append_array(_buscar_todos(c, clase))
 	return r
+
+
+## Los brazos pasan de normales a contener el oro, en DESPERTAR_SEG s:
+##   0,00-0,15  las manos suben frente a la cara, con las palmas hacia uno.
+##   0,15-0,60  tiemblan (el espasmo de los gestos) y se cierran en puno; el oro entra: las venas crecen desde cero y un
+##              frente las enciende de los nudillos al codo en los dos brazos.
+##   0,60-0,72  pico: el oro arde (brillo ~3) y las manos se abren de golpe; destello y patada de FOV.
+##   0,72-1,00  el frente se retira, el brillo vuelve al latido de reposo y las manos bajan. Quedan las venas de reposo
+##              (`base`, por defecto 0,5: con poderes).
+func despertar_oro(base := 0.5) -> void:
+	_despertar_t = 0.0
+	_despertar_base = base
+	venas_base = 0.0
+
+
+## Brazos normales: las venas se retiran del todo (en ~1 s).
+func brazos_normales() -> void:
+	_despertar_t = -1.0
+	create_tween().tween_property(self, "venas_base", 0.0, 1.0)
+
+
+## Fija (y mezcla con lo que ya habia) los valores del guion; ver `_guion`.
+func guion(d: Dictionary) -> void:
+	_guion.merge(d, true)
+
+
+## Devuelve las manos al juego: pose, puno y venas automaticos otra vez, sin sangre.
+func soltar_guion() -> void:
+	venas_base = float(_guion.get("venas_base", venas_base))
+	_guion = {}
+	if _capas != null:
+		_capas.apretar = 0.0
+		_capas.palmas = 0.0
+	if _piel != null:
+		_piel.set_shader_parameter("sangre", 0.0)
+
+
+func en_guion() -> bool:
+	return not _guion.is_empty()
+
+
+## Las venas de oro reaccionan (`k` 0..1): brillan de golpe y tiemblan un poco. Sin oro (venas_base ~0) no pasa nada.
+func reaccionar(k: float) -> void:
+	_reaccion = maxf(_reaccion, clampf(k, 0.0, 1.0) * smoothstep(0.1, 0.4, venas_base))
+
+
+## Posicion en el mundo del hueso `hueso` (por defecto la muneca) de la mano `lado` (".L" o ".R"); la de las manos si
+## el rig no tiene ese hueso.
+func punto_mano(lado: String, hueso := "hand") -> Vector3:
+	if _sk == null:
+		return global_position
+	var i := _sk.find_bone(hueso + lado)
+	return _sk.global_transform * _sk.get_bone_global_pose(i).origin if i >= 0 else global_position
+
+
+func despertando() -> bool:
+	return _despertar_t >= 0.0
+
+
+## Avanza el despertar; devuelve [peso de la pose 0..1, crecimiento, brillo] o [] si no hay despertar.
+func _despertar(dt: float) -> Array:
+	if _despertar_t < 0.0:
+		return []
+	var antes := _despertar_t / DESPERTAR_SEG
+	_despertar_t += dt
+	var t := _despertar_t / DESPERTAR_SEG
+	if antes < 0.62 and t >= 0.62:
+		pico_despertar.emit()
+		if cuerpo != null:
+			var tw := create_tween()
+			tw.tween_property(cuerpo, "patada_fov", 8.0, 0.12)
+			tw.tween_property(cuerpo, "patada_fov", 0.0, 0.9).set_ease(Tween.EASE_OUT)
+	if t >= 1.0:
+		_despertar_t = -1.0
+		venas_base = _despertar_base
+		if _capas != null:
+			_capas.apretar = 0.0
+		return []
+	var pose := smoothstep(0.0, 0.15, t) * (1.0 - smoothstep(0.8, 1.0, t))
+	venas_base = _despertar_base * smoothstep(0.15, 0.55, t)
+	var frente := smoothstep(0.18, 0.6, t) * (1.0 - smoothstep(0.72, 0.95, t))
+	var dolor := clampf((t - 0.15) / 0.5, 0.0, 1.0)
+	var brillo := 1.0 + 2.0 * smoothstep(0.2, 0.62, t) * (1.0 - smoothstep(0.66, 0.9, t)) + AnimProc.espasmo(dolor, 0.3) * 0.5 * frente
+	if _capas != null:
+		_capas.apretar = smoothstep(0.2, 0.45, t) * (1.0 - smoothstep(0.6, 0.66, t))
+	return [pose, frente, brillo, AnimProc.espasmo(dolor, 0.0) * smoothstep(0.15, 0.3, t) * (1.0 - smoothstep(0.62, 0.7, t))]
 
 
 func lanzar_gesto(poder: String) -> void:
@@ -336,8 +438,30 @@ func _process(dt: float) -> void:
 	var esprint := cuerpo.esprint if cuerpo != null else 0.0
 	position = Vector3(_sway.x + resp.x + bob.x, _sway.y + resp.y + _salto_y + bob.y - ESPRINT_BAJAR * esprint, 0.0)
 	rotation.x = _salto_y * SALTO_CABECEO - ESPRINT_CABECEO * esprint
+	# Colgado de una cornisa (parkour): las manos suben y se adelantan a agarrar el borde.
+	var colg := cuerpo.colgado if cuerpo != null else 0.0
+	position += Vector3(0.0, COLGADO_SUBIR, -COLGADO_ADELANTE) * colg
+	rotation.x += COLGADO_CABECEO * colg
+	var desp := _despertar(dt) if _guion.is_empty() else []
+	_reaccion = maxf(_reaccion - dt / REACCION_SEG, 0.0)
+	if _reaccion > 0.0:
+		position += Vector3(sin(_tiempo * 41.0), sin(_tiempo * 33.0 + 1.0), 0.0) * 0.0025 * _reaccion
+	if not _guion.is_empty():
+		var w := float(_guion.get("pose", 0.0))
+		var tb := float(_guion.get("temblor", 0.0))
+		position += Vector3(0.0, 0.05 * w, 0.02 * w) + Vector3(sin(_tiempo * 37.0), sin(_tiempo * 29.0 + 1.0), sin(_tiempo * 23.0)) * 0.004 * tb
+		rotation.x += 0.12 * w
+	elif not desp.is_empty():
+		# Las manos frente a la cara, temblando.
+		var w: float = desp[0]
+		var temblor: float = desp[3]
+		position += Vector3(temblor * 0.006, 0.035 * w + temblor * 0.004, 0.03 * w)
+		rotation.x += 0.16 * w
 	rotation.z = -bob.x * BOB_ALABEO
 
+	if _capas != null and not _guion.is_empty():
+		_capas.apretar = float(_guion.get("apretar", 0.0))
+		_capas.palmas = float(_guion.get("palmas", 0.0))
 	if _capas != null:
 		var quieto := cuerpo == null or (cuerpo.is_on_floor() and Vector2(cuerpo.velocity.x, cuerpo.velocity.z).length() < 0.3)
 		_capas.en_reposo = p < 0.0 and quieto
@@ -349,8 +473,30 @@ func _process(dt: float) -> void:
 		var sv := AnimProc.resorte(_crec, _crec_v, meta, 0.12, dt)
 		_crec = maxf(sv[0], 0.0)
 		_crec_v = sv[1]
+		if not _guion.is_empty():
+			venas_base = float(_guion.get("venas_base", venas_base))
+			var cg := float(_guion.get("crecimiento", 0.0))
+			var br := float(_guion.get("brillo", 1.0)) + 1.5 * _reaccion
+			_piel.set_shader_parameter("venas_base", venas_base)
+			_piel.set_shader_parameter("crecimiento", cg)
+			_piel.set_shader_parameter("crecimiento_otro", cg)
+			_piel.set_shader_parameter("brillo", br)
+			_piel.set_shader_parameter("brillo_otro", br)
+			_piel.set_shader_parameter("sangre", float(_guion.get("sangre", 0.0)))
+			return
 		_piel.set_shader_parameter("venas_base", venas_base)
-		_piel.set_shader_parameter("crecimiento", _crec)
-		_piel.set_shader_parameter("crecimiento_otro", _crec * 0.3)
-		_piel.set_shader_parameter("brillo", AnimProc.brillo_venas(_tiempo, pv, mana))
-		_piel.set_shader_parameter("brillo_otro", AnimProc.brillo_venas(_tiempo, -1.0, mana))
+		if not desp.is_empty():
+			# Despertar: los dos brazos a la vez, con el frente y el brillo del despertar.
+			_piel.set_shader_parameter("crecimiento", maxf(_crec, desp[1]))
+			_piel.set_shader_parameter("crecimiento_otro", desp[1])
+			_piel.set_shader_parameter("brillo", desp[2])
+			_piel.set_shader_parameter("brillo_otro", desp[2])
+		else:
+			_piel.set_shader_parameter("crecimiento", _crec)
+			_piel.set_shader_parameter("crecimiento_otro", _crec * 0.3)
+			_piel.set_shader_parameter("brillo", AnimProc.brillo_venas(_tiempo, pv, mana) + 1.5 * _reaccion)
+			_piel.set_shader_parameter("brillo_otro", AnimProc.brillo_venas(_tiempo, -1.0, mana) + 1.5 * _reaccion)
+			if _reaccion > 0.0:
+				# El oro se enciende en los dos brazos hasta el codo y se retira hacia los nudillos al apagarse.
+				_piel.set_shader_parameter("crecimiento", maxf(_crec, _reaccion))
+				_piel.set_shader_parameter("crecimiento_otro", maxf(_crec * 0.3, _reaccion))

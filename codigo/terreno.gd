@@ -20,6 +20,7 @@ shader_type spatial;
 render_mode cull_disabled;   // los faldones se ven por las dos caras
 
 #include "res://codigo/relieve.gdshaderinc"
+#include "res://codigo/biomas_andinos.gdshaderinc"
 
 uniform float faldon = 30.0;
 // Texturas de suelo (Poly Haven, CC0): hierba seca, tierra con piedras y roca. Se ven de cerca; lejos se funden con
@@ -36,7 +37,15 @@ uniform vec3 color_ichu : source_color = vec3(0.58, 0.49, 0.31);
 uniform vec3 color_verde : source_color = vec3(0.33, 0.38, 0.22);
 uniform vec3 color_tierra : source_color = vec3(0.46, 0.37, 0.27);
 uniform vec3 color_roca : source_color = vec3(0.43, 0.40, 0.36);
-uniform float sombra_nubes = 0.35;  // cuanto oscurecen las sombras de las nubes que corren con el viento
+uniform float sombra_nubes = 0.5;   // cuanto oscurecen las sombras de las nubes que corren con el viento
+// Chacras en los fondos de valle (de lejos): parcelas de verdes y ocres con pircas oscuras en los bordes y algun arbol.
+uniform vec3 chacra_verde : source_color = vec3(0.30, 0.42, 0.16);
+uniform vec3 chacra_ocre : source_color = vec3(0.58, 0.50, 0.26);
+uniform vec3 color_pirca : source_color = vec3(0.16, 0.14, 0.12);
+// Huecos (boca del pozo, entrada de la cueva): (x, z, radio). Ahi el suelo no se dibuja; la pieza que va dentro tapa el borde.
+uniform vec3 huecos[16];
+uniform int n_huecos = 0;
+global uniform float humedad;   // 0..1: la lluvia (Lluvia) moja el suelo
 
 varying vec3 v_pos;
 varying vec3 v_normal;
@@ -62,6 +71,11 @@ void vertex() {
 }
 
 void fragment() {
+	for (int i = 0; i < n_huecos; i++) {
+		if (distance(v_pos.xz, huecos[i].xy) < huecos[i].z) {
+			discard;
+		}
+	}
 	vec3 n = v_normal;
 	float pend = 1.0 - n.y;                                 // 0 llano, ~0.3 a 45 grados
 	float alt = v_pos.y;                                    // relativa a la plaza (3482 m)
@@ -76,6 +90,32 @@ void fragment() {
 	vec3 hierba_lejos = mix(color_ichu, color_verde, (1.0 - smoothstep(-1200.0, -500.0, alt)) * 0.8 + v3 * 0.35);
 	vec3 suelo_lejos = mix(color_tierra, hierba_lejos, ichu * 0.8 + 0.2) * (0.85 + 0.3 * v1);
 	vec3 lejos = mix(suelo_lejos, color_roca * (0.8 + 0.4 * v1), roca_w);
+	// Mas lejos, los pisos ecologicos por altitud real (biomas_andinos): valles verdes, quenuales en las quebradas,
+	// puna pajiza y superpuna de pedregal en las cumbres (el relieve real no llega a la cota de nieve).
+	float lejania = smoothstep(450.0, 1600.0, dist);
+	if (lejania > 0.0) {
+		float e = 90.0;
+		float vecinos = (altura(p + vec2(e, 0.0)) + altura(p - vec2(e, 0.0)) + altura(p + vec2(0.0, e)) + altura(p - vec2(0.0, e))) * 0.25;
+		float conc = clamp((vecinos - v_pos.y) / bio_exageracion(length(p)) / 18.0, 0.0, 1.0);
+		vec4 piso = bio_suelo(bio_msnm(v_pos), n, conc, v3, bio_ruido(p / 90.0), 0.0, bio_exageracion(length(p)));
+		lejos = mix(lejos, piso.rgb * (0.9 + 0.2 * v1), lejania);
+	}
+	// Chacras: en lo llano del fondo de los valles, parcelas giradas de 40-80 m, de verde a ocre, con la pirca del borde
+	// (se ensancha con la distancia para no parpadear) y arboles sueltos junto a ella.
+	float en_valle = (1.0 - smoothstep(-650.0, -420.0, alt)) * (1.0 - smoothstep(0.05, 0.12, pend)) * smoothstep(250.0, 600.0, dist);
+	if (en_valle > 0.0) {
+		vec2 q = mat2(vec2(0.82, 0.57), vec2(-0.57, 0.82)) * p / vec2(62.0, 44.0);
+		vec2 celda = floor(q);
+		vec2 f = fract(q);
+		float tono = azar(celda);
+		vec3 parcela = mix(chacra_verde, chacra_ocre, smoothstep(0.55, 0.9, tono)) * (0.8 + 0.35 * azar(celda + 7.1));
+		float ancho_pirca = clamp(dist / 9000.0, 0.012, 0.06);
+		float borde = min(min(f.x, 1.0 - f.x) * 62.0 / 44.0, min(f.y, 1.0 - f.y));
+		float pirca = 1.0 - smoothstep(ancho_pirca, ancho_pirca * 2.0, borde);
+		float arbol = step(0.78, azar(floor(p / 9.0))) * (1.0 - smoothstep(0.0, 0.12, borde));
+		parcela = mix(parcela, color_pirca, max(pirca * 0.85, arbol * 0.7));
+		lejos = mix(lejos, parcela, en_valle);
+	}
 
 	// Cerca: texturas.
 	vec3 cerca = lejos;
@@ -100,13 +140,35 @@ void fragment() {
 		n_det = normalize(vec3(n.x + nd.x, n.y, n.z - nd.y));
 	}
 	ALBEDO = mix(lejos, cerca, detalle);
+	// Paredes del cañon (y riscos): roca a cualquier distancia, con estratos horizontales y surcos que bajan. La malla se
+	// estira mucho en vertical y sin esto la pared era una cortina lisa.
+	float pared = smoothstep(0.42, 0.7, pend);
+	if (pared > 0.0) {
+		vec3 rr = triplanar(tex_roca, v_pos, n, 26.0) * 0.55 + triplanar(tex_roca, v_pos, n, 8.0) * 0.45;
+		rr *= color_roca / max(textureLod(tex_roca, vec2(0.5), 12.0).rgb, vec3(0.02));
+		vec2 hor = normalize(vec2(-n.z, n.x) + vec2(0.0001));
+		float a_lo_largo = dot(v_pos.xz, hor);
+		// Estratos: bandas de distinto grosor y tono (ruido estirado en horizontal), no una onda regular.
+		float banda = fbm(vec2(a_lo_largo / 260.0, v_pos.y / 5.5 + fbm(v_pos.xz / 90.0) * 3.0));
+		float estrato = 0.78 + 0.32 * smoothstep(0.35, 0.75, banda) - 0.12 * smoothstep(0.6, 0.9, fbm(vec2(a_lo_largo / 30.0, v_pos.y / 2.0)));
+		float surco = 0.8 + 0.4 * fbm(vec2(a_lo_largo / 6.0, v_pos.y / 110.0));
+		vec3 tono = mix(vec3(0.82, 0.68, 0.55), vec3(0.58, 0.52, 0.47), smoothstep(0.3, 0.7, fbm(vec2(a_lo_largo / 150.0, v_pos.y / 40.0))));
+		ALBEDO = mix(ALBEDO, rr * tono * estrato * surco, pared);
+	}
 
 	// Sombras de nubes que corren con el viento: el fondo tambien se mueve.
-	float nube = smoothstep(0.52, 0.72, fbm((p - viento_dir * TIME * 9.0) / 1100.0 + 7.0));
+	float nube = smoothstep(0.5, 0.7, fbm((p - viento_dir * TIME * 9.0) / 1800.0 + 7.0));   // nubes grandes
 	ALBEDO *= 1.0 - sombra_nubes * nube;
 
+	// Lluvia: el suelo mojado es mas oscuro y brillante; en lo llano se forman charcos que reflejan el cielo.
+	float charco = humedad * smoothstep(0.985, 0.996, n.y) * smoothstep(0.55, 0.72, fbm(p / 3.0 + 21.0)) * detalle;
+	ALBEDO *= mix(1.0, 0.62, humedad) * (1.0 - 0.45 * charco);
+	n_det = normalize(mix(n_det, n, charco));
 	NORMAL = (VIEW_MATRIX * vec4(n_det, 0.0)).xyz;
-	ROUGHNESS = 0.95;
+	ROUGHNESS = mix(mix(0.95, 0.5, humedad), 0.04, charco);
+	// Seco, el suelo apenas brilla: con el especular por defecto (0,5) las laderas lejanas, vistas al sesgo, reflejaban el
+	// cielo y se veian palidas, casi blancas. Mojado y en los charcos si brilla.
+	SPECULAR = mix(mix(0.1, 0.5, humedad), 0.5, charco);
 }
 """
 
@@ -121,8 +183,16 @@ const TEXTURAS := {
 
 var lejos: Image
 var cerca: Image
+var obras: Image                 # suelo de obra (pueblo), ver poner_obras
 var _tex_lejos: ImageTexture
 var _tex_cerca: ImageTexture
+var _tex_obras: ImageTexture
+var _mat: ShaderMaterial
+var _forma: HeightMapShape3D
+var _huecos := PackedVector3Array()       # (x, z, radio) que no se dibujan
+var _huecos_col := PackedVector3Array()   # (x, z, radio) que no chocan
+var _huecos_pendientes := false
+const MAX_HUECOS := 16
 var _m_por_px: Vector2
 var _centro_px: Vector2
 var _paso_cerca: float
@@ -142,6 +212,7 @@ func _ready() -> void:
 	sh.code = SHADER
 	var mat := ShaderMaterial.new()
 	mat.shader = sh
+	_mat = mat
 	configurar(mat)
 	mat.set_shader_parameter("faldon", FALDON_M)
 	for t: String in TEXTURAS:
@@ -166,6 +237,105 @@ func configurar(mat: ShaderMaterial) -> void:
 	mat.set_shader_parameter("tam_lejos", Vector2(lejos.get_width(), lejos.get_height()))
 	mat.set_shader_parameter("lado_cerca", _lado_cerca)
 	mat.set_shader_parameter("paso_cerca", _paso_cerca)
+	if _tex_obras != null:
+		mat.set_shader_parameter("obras", _tex_obras)
+		mat.set_shader_parameter("paso_obras", _lado_cerca / (obras.get_width() - 1))
+
+
+## Pinta suelo de obra (1 = obra: ahi no crece nada y el suelo es de tierra pisada) en una imagen de 1 m/px que cubre la
+## zona jugable. Cada huella: [centro (Vector2, mundo), semilados (Vector2), giro (rad, como Basis(UP, giro)), valor 0..1,
+## margen m (se desvanece hacia fuera)]. Se mezcla con lo ya pintado (maximo). Hay que llamarlo antes de crear lo que
+## se apoya en el terreno (Vegetacion).
+func pintar_obras(huellas: Array) -> void:
+	var n := int(_lado_cerca) + 1
+	if obras == null:
+		obras = Image.create(n, n, false, Image.FORMAT_R8)
+	var datos := obras.get_data()
+	var mitad := _lado_cerca * 0.5
+	for hu: Array in huellas:
+		var c: Vector2 = hu[0]
+		var medio: Vector2 = hu[1]
+		var giro: float = hu[2]
+		var valor: float = hu[3]
+		var margen: float = hu[4]
+		var ca := cos(giro)
+		var sa := sin(giro)
+		var radio := medio.length() + margen
+		var i0 := clampi(int(c.x - radio + mitad), 0, n - 1)
+		var i1 := clampi(int(c.x + radio + mitad) + 1, 0, n - 1)
+		var j0 := clampi(int(c.y - radio + mitad), 0, n - 1)
+		var j1 := clampi(int(c.y + radio + mitad) + 1, 0, n - 1)
+		for j in range(j0, j1 + 1):
+			for i in range(i0, i1 + 1):
+				var dx := i - mitad - c.x
+				var dz := j - mitad - c.y
+				# Al marco de la huella: inversa de Basis(UP, giro) en el plano.
+				var lx := dx * ca - dz * sa
+				var lz := dx * sa + dz * ca
+				var d := maxf(absf(lx) - medio.x, absf(lz) - medio.y)
+				var v := valor if d <= 0.0 else valor * (1.0 - smoothstep(0.0, maxf(margen, 0.01), d))
+				if v <= 0.0:
+					continue
+				var k := j * n + i
+				datos[k] = maxi(datos[k], int(v * 255.0))
+	obras.set_data(n, n, false, Image.FORMAT_R8, datos)
+	_tex_obras = ImageTexture.create_from_image(obras)
+	configurar(_mat)
+
+
+## Abre un hueco redondo en el suelo (x, z, radio): no se dibuja y no choca. `radio_colision` (por defecto 1 m menos que
+## el dibujo, porque la rejilla de colision es de 2 m) es lo que se abre en la colision: la pieza que va dentro (brocal,
+## boca de cueva) debe tapar el borde. Los huecos se aplican juntos al final del frame.
+func abrir_hueco(x: float, z: float, radio: float, radio_colision := -1.0) -> void:
+	if _huecos.size() >= MAX_HUECOS:
+		push_warning("Terreno: demasiados huecos")
+		return
+	_huecos.append(Vector3(x, z, radio))
+	_huecos_col.append(Vector3(x, z, radio_colision if radio_colision > 0.0 else maxf(radio - 1.0, 0.4)))
+	var lista := _huecos.duplicate()
+	lista.resize(MAX_HUECOS)
+	_mat.set_shader_parameter("huecos", lista)
+	_mat.set_shader_parameter("n_huecos", _huecos.size())
+	if not _huecos_pendientes:
+		_huecos_pendientes = true
+		_aplicar_huecos.call_deferred()
+
+
+func _aplicar_huecos() -> void:
+	_huecos_pendientes = false
+	var datos := cerca.get_data().to_float32_array()
+	var m := cerca.get_width()
+	var mitad := _lado_cerca * 0.5
+	for h in _huecos_col:
+		var i0 := clampi(int((h.x - h.z + mitad) / _paso_cerca), 0, m - 1)
+		var i1 := clampi(int((h.x + h.z + mitad) / _paso_cerca) + 1, 0, m - 1)
+		var j0 := clampi(int((h.y - h.z + mitad) / _paso_cerca), 0, m - 1)
+		var j1 := clampi(int((h.y + h.z + mitad) / _paso_cerca) + 1, 0, m - 1)
+		for j in range(j0, j1 + 1):
+			for i in range(i0, i1 + 1):
+				if Vector2(-mitad + i * _paso_cerca - h.x, -mitad + j * _paso_cerca - h.y).length() <= h.z:
+					datos[j * m + i] = NAN
+	_forma.map_data = datos
+
+
+## Si (x, z) cae en un hueco.
+func en_hueco(x: float, z: float) -> bool:
+	for h in _huecos:
+		if Vector2(x - h.x, z - h.y).length() < h.z:
+			return true
+	return false
+
+
+## Cuanto suelo de obra hay en x, z (0..1).
+func obra(x: float, z: float) -> float:
+	if obras == null:
+		return 0.0
+	var paso := _lado_cerca / (obras.get_width() - 1)
+	var i := int(round((x + _lado_cerca * 0.5) / paso))
+	var j := int(round((z + _lado_cerca * 0.5) / paso))
+	if i < 0 or j < 0 or i >= obras.get_width() or j >= obras.get_height():
+		return 0.0
+	return obras.get_pixel(i, j).r
 
 
 ## Normal del suelo en x, z (la misma cuenta que el shader).
@@ -248,6 +418,7 @@ func _colision() -> void:
 	var cuerpo := StaticBody3D.new()
 	add_child(cuerpo)
 	var forma := HeightMapShape3D.new()
+	_forma = forma
 	forma.map_width = cerca.get_width()
 	forma.map_depth = cerca.get_height()
 	forma.map_data = cerca.get_data().to_float32_array()

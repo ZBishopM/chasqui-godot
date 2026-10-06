@@ -11,6 +11,10 @@ uniform float paso_cerca;
 // Viento: direccion (en el suelo) y fuerza 0..1. Mueve el ichu y las sombras de las nubes.
 uniform vec2 viento_dir = vec2(0.8, -0.6);
 uniform float viento_fuerza = 0.6;
+// Suelo de obra (el pueblo, ver Terreno.poner_obras): 1 donde hay casas, plataformas y calles. Ahi no crece ichu y el
+// terreno pinta tierra pisada. Cubre la zona jugable a 1 px por `paso_obras` m; sin pueblo vale 0 en todas partes.
+uniform sampler2D obras : hint_default_black, filter_linear, repeat_disable;
+uniform float paso_obras = 1.0;
 
 float h_lejos(vec2 xz) {
 	return texture(alt_lejos, (centro_px + xz / m_por_px + 0.5) / tam_lejos).r;
@@ -48,10 +52,16 @@ float ruido(vec2 p) {
 
 float fbm(vec2 p) { return ruido(p) * 0.5 + ruido(p * 2.1 + 3.7) * 0.3 + ruido(p * 4.3 + 9.1) * 0.2; }
 
-// Cuanto ichu crece aqui (0..1): nada en pendientes fuertes, manchas de tierra desnuda entre matas. El terreno usa el
-// mismo valor para poner textura de hierba seca o de tierra, asi el ichu nace donde el suelo es de hierba.
+float obra(vec2 xz) {
+	float n = lado_cerca / paso_obras + 1.0;
+	return texture(obras, ((xz + lado_cerca * 0.5) / paso_obras + 0.5) / n).r;
+}
+
+// Cuanto ichu crece aqui (0..1): nada en pendientes fuertes, manchas de tierra desnuda entre matas, nada en el suelo del
+// pueblo. El terreno usa el mismo valor para poner textura de hierba seca o de tierra, asi el ichu nace donde el suelo
+// es de hierba.
 float cobertura_ichu(vec2 xz, vec3 n) {
 	float pend = 1.0 - n.y;
 	float claros = smoothstep(0.35, 0.6, fbm(xz / 23.0 + 51.0));
-	return (1.0 - smoothstep(0.12, 0.22, pend)) * claros;
+	return (1.0 - smoothstep(0.12, 0.22, pend)) * claros * (1.0 - obra(xz));
 }

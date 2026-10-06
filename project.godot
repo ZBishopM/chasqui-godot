@@ -24,22 +24,13 @@ window/size/viewport_height=720
 
 anti_aliasing/quality/msaa_3d=2
 
-[autoload]
+[physics]
 
+3d/physics_engine="Jolt Physics"
 
+[shader_globals]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+humedad={
+"type": "float",
+"value": 0.0
+}

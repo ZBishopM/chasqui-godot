@@ -6,6 +6,7 @@ extends Node3D
 ##    hierba (cobertura_ichu). Se mecen con rafagas que cruzan el campo y se apartan al paso del jugador.
 ##  - Rocas, matorrales y flores (escaneos de Poly Haven, CC0, coleccion Namaqualand: un valle seco como los de Ayacucho),
 ##    repartidos con reglas de pendiente y manchas, en MultiMesh por trozos de 150 m que se dejan de dibujar de lejos.
+## Nada crece en el suelo de obra del pueblo (Terreno.obra).
 
 ## Dos anillos de ichu que siguen al jugador: cerca matas densas de 22 hojas; mas lejos, matas de 9 hojas mas separadas
 ## (con 22 hojas en todo el campo eran 5,3 millones de triangulos). Se funden entre 18 y 25 m.
@@ -45,6 +46,7 @@ uniform float alcance = 55.0;   // m: mas alla las matas se encogen hasta desapa
 uniform float inicio = 0.0;     // m: mas aca tambien (es el otro anillo)
 uniform vec3 color_base : source_color = vec3(0.45, 0.39, 0.24);
 uniform vec3 color_punta : source_color = vec3(0.82, 0.73, 0.50);
+global uniform float humedad;   // lluvia: la paja mojada se oscurece
 
 varying float v_alto;
 varying float v_tono;
@@ -69,7 +71,9 @@ void vertex() {
 	float ang = h1 * 6.2831;
 	mat2 giro = mat2(vec2(cos(ang), sin(ang)), vec2(-sin(ang), cos(ang)));
 	vec3 v = VERTEX;
-	v.xz = giro * v.xz * (0.6 + 0.8 * tam);
+	// Sin mata (tam 0) se colapsa del todo: aplanada seguia a ras del suelo y se veia en los huecos del terreno (fosa,
+	// pozo, boca de la cueva), donde el suelo no se dibuja.
+	v.xz = giro * v.xz * (0.6 + 0.8 * tam) * step(0.0001, tam);
 	v.y *= alt;
 	// Viento: rafagas que cruzan el campo (ruido que avanza con el viento) + temblor de cada hoja.
 	float t = UV.y * UV.y;                       // 0 en la base, 1 en la punta
@@ -92,6 +96,7 @@ void vertex() {
 void fragment() {
 	vec3 c = mix(color_base, color_punta, smoothstep(0.0, 0.9, v_alto));
 	c *= 0.8 + 0.4 * v_tono;
+	c *= mix(1.0, 0.72, humedad);
 	ALBEDO = c;
 	ROUGHNESS = 0.9;
 	BACKLIGHT = c * 0.5;                         // la paja deja pasar la luz
@@ -209,6 +214,8 @@ func _repartir() -> void:
 			intentos += 1
 			var x := rng.randf_range(-lado * 0.5, lado * 0.5)
 			var z := rng.randf_range(-lado * 0.5, lado * 0.5)
+			if terreno.obra(x, z) > 0.05:   # nada dentro del pueblo
+				continue
 			var n := terreno.normal(x, z)
 			var pend := 1.0 - n.y
 			var mancha := manchas.get_noise_2d(x + modelo.length() * 97.0, z) * 0.5 + 0.5
