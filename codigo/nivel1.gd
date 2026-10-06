@@ -17,6 +17,8 @@ var cielo: Sky3D
 var terreno: Terreno
 var pueblo: Pueblo
 var hogar: Hogar
+var fosa: Fosa
+var canon: Canon
 var camino: Camino
 var templo: Templo
 var vegetacion: Vegetacion
@@ -47,9 +49,16 @@ func _ready() -> void:
 	camino.terreno = terreno
 	camino.destino = Vector2(templo.entrada.x, templo.entrada.z)
 	add_child(camino)
+	canon = Canon.new()   # el cañon del sur (tallado en el relieve horneado): rio, barrera en el borde, peñascos
+	canon.terreno = terreno
+	add_child(canon)
+	fosa = Fosa.new()   # la fosa comun escondida en el filo del cañon (antes de la vegetacion: pinta su suelo)
+	fosa.terreno = terreno
+	add_child(fosa)
 	miradores.append_array(pueblo.miradores)
 	miradores.append_array(hogar.miradores)
 	miradores.append_array(camino.miradores)
+	miradores.append_array(fosa.miradores)
 	miradores.append_array(templo.miradores)
 	_miradores_cordillera()
 	vegetacion = Vegetacion.new()

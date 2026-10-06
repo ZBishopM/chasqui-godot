@@ -71,7 +71,9 @@ void vertex() {
 	float ang = h1 * 6.2831;
 	mat2 giro = mat2(vec2(cos(ang), sin(ang)), vec2(-sin(ang), cos(ang)));
 	vec3 v = VERTEX;
-	v.xz = giro * v.xz * (0.6 + 0.8 * tam);
+	// Sin mata (tam 0) se colapsa del todo: aplanada seguia a ras del suelo y se veia en los huecos del terreno (fosa,
+	// pozo, boca de la cueva), donde el suelo no se dibuja.
+	v.xz = giro * v.xz * (0.6 + 0.8 * tam) * step(0.0001, tam);
 	v.y *= alt;
 	// Viento: rafagas que cruzan el campo (ruido que avanza con el viento) + temblor de cada hoja.
 	float t = UV.y * UV.y;                       // 0 en la base, 1 en la punta

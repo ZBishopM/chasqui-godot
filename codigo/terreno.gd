@@ -140,6 +140,21 @@ void fragment() {
 		n_det = normalize(vec3(n.x + nd.x, n.y, n.z - nd.y));
 	}
 	ALBEDO = mix(lejos, cerca, detalle);
+	// Paredes del cañon (y riscos): roca a cualquier distancia, con estratos horizontales y surcos que bajan. La malla se
+	// estira mucho en vertical y sin esto la pared era una cortina lisa.
+	float pared = smoothstep(0.42, 0.7, pend);
+	if (pared > 0.0) {
+		vec3 rr = triplanar(tex_roca, v_pos, n, 26.0) * 0.55 + triplanar(tex_roca, v_pos, n, 8.0) * 0.45;
+		rr *= color_roca / max(textureLod(tex_roca, vec2(0.5), 12.0).rgb, vec3(0.02));
+		vec2 hor = normalize(vec2(-n.z, n.x) + vec2(0.0001));
+		float a_lo_largo = dot(v_pos.xz, hor);
+		// Estratos: bandas de distinto grosor y tono (ruido estirado en horizontal), no una onda regular.
+		float banda = fbm(vec2(a_lo_largo / 260.0, v_pos.y / 5.5 + fbm(v_pos.xz / 90.0) * 3.0));
+		float estrato = 0.78 + 0.32 * smoothstep(0.35, 0.75, banda) - 0.12 * smoothstep(0.6, 0.9, fbm(vec2(a_lo_largo / 30.0, v_pos.y / 2.0)));
+		float surco = 0.8 + 0.4 * fbm(vec2(a_lo_largo / 6.0, v_pos.y / 110.0));
+		vec3 tono = mix(vec3(0.82, 0.68, 0.55), vec3(0.58, 0.52, 0.47), smoothstep(0.3, 0.7, fbm(vec2(a_lo_largo / 150.0, v_pos.y / 40.0))));
+		ALBEDO = mix(ALBEDO, rr * tono * estrato * surco, pared);
+	}
 
 	// Sombras de nubes que corren con el viento: el fondo tambien se mueve.
 	float nube = smoothstep(0.5, 0.7, fbm((p - viento_dir * TIME * 9.0) / 1800.0 + 7.0));   // nubes grandes

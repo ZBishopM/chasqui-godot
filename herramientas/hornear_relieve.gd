@@ -11,7 +11,8 @@ extends SceneTree
 ## los valles, que se ahondan. Lejos se anaden riscos (ruido de crestas). Dos abras (ABRAS): hacia la puesta de sol del
 ## 21 de junio vista desde el borde oeste del pueblo (el hogar del Chasqui) y hacia la salida del sol vista desde el
 ## templo, los cerros se rebajan: el sol se pone y sale en un hueco entre montanas. En la zona jugable el detalle fino
-## crece con la pendiente: laderas quebradas, llanos edificables.
+## crece con la pendiente: laderas quebradas, llanos edificables. Al final se talla el cañon del sur (Canon.tallar):
+## ~500 m de hondo, pegado al Qhapaq Ñan.
 
 const FUENTE := "res://assets/relieve/fuente/vilcashuaman"
 const LEJOS := "res://assets/relieve/vilcas_lejos.res"
@@ -83,7 +84,8 @@ func _initialize() -> void:
 	for j in n:
 		var z := (j - float(centro[1])) * mz
 		for i in n:
-			lejos[j * n + i] = _quebrar((i - float(centro[0])) * mx, z, datos[j * n + i] - h0)
+			var x := (i - float(centro[0])) * mx
+			lejos[j * n + i] = Canon.tallar(x, z, _quebrar(x, z, datos[j * n + i] - h0))
 	var img_l := Image.create_from_data(n, n, false, Image.FORMAT_RF, lejos.to_byte_array())
 	img_l.set_meta("m_por_px", Vector2(mx, mz))
 	img_l.set_meta("centro_px", Vector2(centro[0], centro[1]))
@@ -121,7 +123,7 @@ func _initialize() -> void:
 			var dz := base[mini(j + 2, m - 1) * m + i] - base[maxi(j - 2, 0) * m + i]
 			var pend := Vector2(dx, dz).length() / (4.0 * CERCA_PASO)
 			var amp := lerpf(DETALLE_M.x, DETALLE_M.y, smoothstep(0.08, 0.35, pend))
-			cerca[j * m + i] = base[j * m + i] + ruido.get_noise_2d(x, z) * amp * peso
+			cerca[j * m + i] = Canon.tallar(x, z, base[j * m + i] + ruido.get_noise_2d(x, z) * amp * peso)
 	var img_c := Image.create_from_data(m, m, false, Image.FORMAT_RF, cerca.to_byte_array())
 	img_c.set_meta("paso_m", CERCA_PASO)
 	print("cerca: %d px a %.0f m (%.0f m de lado), altura en el centro %.2f m -> %s" % [

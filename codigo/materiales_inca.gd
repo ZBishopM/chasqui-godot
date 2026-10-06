@@ -174,12 +174,7 @@ void fragment() {
 }
 """
 
-## Tejido andino (mantas, la cama, la lliclla colgada): franjas a lo largo de UV.y (en metros) y, en las franjas anchas
-## (pallay), rombos escalonados. Rojo de cochinilla, amarillo de chilca, negro y blanco de lana sin tenir.
-const SHADER_MANTA := """
-shader_type spatial;
-render_mode cull_disabled;
-
+const _PALLAY := """
 uniform vec3 rojo : source_color = vec3(0.55, 0.07, 0.06);
 uniform vec3 amarillo : source_color = vec3(0.78, 0.55, 0.12);
 uniform vec3 negro : source_color = vec3(0.07, 0.05, 0.05);
@@ -189,19 +184,20 @@ uniform float semilla = 0.0;
 
 float hash(float n) { return fract(sin(n * 12.9898 + semilla * 4.13) * 43758.5453); }
 
-void fragment() {
-	// Repeticion de 0,9 m: franja ancha de pallay (0,32), listas finas a los lados y fondo rojo.
-	float v = fract(UV.y / 0.9);
+// El tejido (UV en metros): repeticion de 0,9 m con una franja ancha de pallay (0,32), listas finas a los lados y
+// fondo rojo; trama de hilos finos.
+vec3 pallay(vec2 uv) {
+	float v = fract(uv.y / 0.9);
 	vec3 c = rojo;
 	if (v < 0.04 || (v > 0.47 && v < 0.51)) c = negro;
 	else if (v < 0.08 || (v > 0.43 && v < 0.47)) c = amarillo;
 	else if (v > 0.10 && v < 0.42) {
 		// Pallay: rombos escalonados (distancia de Manhattan pixelada en celdas de 2 cm) de colores que alternan.
-		float celda = floor(UV.x / 0.24);
-		vec2 q = vec2(fract(UV.x / 0.24) - 0.5, (v - 0.26) / 0.32 * 1.33);
+		float celda = floor(uv.x / 0.24);
+		vec2 q = vec2(fract(uv.x / 0.24) - 0.5, (v - 0.26) / 0.32 * 1.33);
 		q = floor(q * 12.0 + 0.5) / 12.0;
 		float d = abs(q.x) + abs(q.y);
-		float h = hash(celda + floor(UV.y / 0.9) * 7.0);
+		float h = hash(celda + floor(uv.y / 0.9) * 7.0);
 		vec3 centro = h < 0.5 ? amarillo : verde;
 		c = negro;
 		if (d < 0.42) c = blanco;
@@ -209,12 +205,71 @@ void fragment() {
 		if (d < 0.12) c = rojo;
 	} else if (v > 0.55 && v < 0.58) c = blanco;
 	else if (v > 0.62 && v < 0.64) c = amarillo;
-	// Trama: hilos finos que dan textura y un poco de desgaste.
-	float hilo = 0.85 + 0.15 * sin(UV.x * 900.0) * sin(UV.y * 700.0);
-	ALBEDO = c * hilo;
+	return c * (0.85 + 0.15 * sin(uv.x * 900.0) * sin(uv.y * 700.0));
+}
+"""
+
+## Tejido andino (mantas, la cama, la lliclla colgada): franjas a lo largo de UV.y (en metros) y, en las franjas anchas
+## (pallay), rombos escalonados. Rojo de cochinilla, amarillo de chilca, negro y blanco de lana sin tenir.
+const SHADER_MANTA := """
+shader_type spatial;
+render_mode cull_disabled;
+""" + _PALLAY + """
+void fragment() {
+	ALBEDO = pallay(UV);
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.15;
 	SSS_STRENGTH = 0.2;
+}
+"""
+
+## Mortaja: una manta tejida (pallay) empapada, con barro por debajo (COLOR.r) y manchas de sangre donde COLOR.g es
+## alto. Por instancia: `sangre` (0..1) es cuanta sangre queda (la absorcion del despertar la seca) y `tinte` cambia
+## el color de fondo de la manta (cochinilla, nogal, chilca, indigo), para que no sean todas iguales.
+const SHADER_MORTAJA := """
+shader_type spatial;
+render_mode cull_disabled;
+""" + _PALLAY + """
+instance uniform float sangre = 1.0;
+instance uniform float tinte = 0.0;
+uniform vec3 color_sangre : source_color = vec3(0.20, 0.015, 0.015);
+uniform vec3 color_barro : source_color = vec3(0.19, 0.14, 0.10);
+varying vec2 v_mascara;
+
+float ruido(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = hash(dot(i, vec2(1.0, 57.0)));
+	float b = hash(dot(i + vec2(1.0, 0.0), vec2(1.0, 57.0)));
+	float c = hash(dot(i + vec2(0.0, 1.0), vec2(1.0, 57.0)));
+	float d = hash(dot(i + vec2(1.0, 1.0), vec2(1.0, 57.0)));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+void vertex() {
+	v_mascara = COLOR.rg;
+}
+
+void fragment() {
+	vec2 uv = UV;
+	vec2 mascara = v_mascara;
+	vec3 c = pallay(uv + vec2(tinte * 3.7, tinte * 1.3));
+	// Otro tinte de fondo: donde la manta es roja (cochinilla) pasa a nogal, chilca o indigo segun la instancia.
+	float es_rojo = smoothstep(0.15, 0.3, c.r - max(c.g, c.b));
+	vec3 fondo = tinte < 0.25 ? c : (tinte < 0.5 ? vec3(0.22, 0.12, 0.06) : (tinte < 0.75 ? vec3(0.45, 0.33, 0.06) : vec3(0.05, 0.08, 0.2)));
+	c = mix(c, fondo * (0.85 + 0.15 * sin(UV.x * 900.0) * sin(UV.y * 700.0)), es_rojo);
+	c = mix(c, vec3(dot(c, vec3(0.33))), 0.15) * 0.92;   // mojada y vieja
+	float r = ruido(uv * 7.0) * 0.6 + ruido(uv * 23.0) * 0.4;
+	// Tierra por todas partes (los echaron al hoyo) y barro espeso por debajo.
+	c = mix(c, color_barro * 1.5, smoothstep(0.5, 0.88, ruido(uv * 3.1 + 11.0)) * 0.25);
+	float barro = smoothstep(0.25, 0.65, mascara.r + (r - 0.5) * 0.6);
+	c = mix(c, color_barro, barro * 0.9);
+	float mancha = smoothstep(0.5, 0.62, mascara.g * 0.8 + r * 0.6 - (1.0 - sangre) * 0.9);
+	c = mix(c, color_sangre, mancha);
+	ALBEDO = c;
+	ROUGHNESS = mix(mix(0.8, 0.55, barro), 0.25, mancha);
+	SPECULAR = 0.35;
 }
 """
 
@@ -290,6 +345,15 @@ static func todos() -> Dictionary:
 	sh_manta.code = SHADER_MANTA
 	var manta := ShaderMaterial.new()
 	manta.shader = sh_manta
+	var sh_mortaja := Shader.new()
+	sh_mortaja.code = SHADER_MORTAJA
+	var mortaja := ShaderMaterial.new()
+	mortaja.shader = sh_mortaja
+	# Barro del fondo de la fosa: la tierra de las plataformas, oscura y mojada.
+	var barro := tierra.duplicate() as StandardMaterial3D
+	barro.albedo_color = Color(0.42, 0.33, 0.26)
+	barro.roughness = 0.4
+	barro.metallic_specular = 0.6
 	var plano := func(color: Color, rugoso := 0.9) -> StandardMaterial3D:
 		var m := StandardMaterial3D.new()
 		m.albedo_color = color
@@ -300,6 +364,7 @@ static func todos() -> Dictionary:
 	hierba.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var algodon: StandardMaterial3D = plano.call(Color(0.78, 0.72, 0.60))
 	var lana: StandardMaterial3D = plano.call(Color(0.50, 0.09, 0.07))
+	var soga: StandardMaterial3D = plano.call(Color(0.42, 0.35, 0.22))   # soga de ichu torcido, mojada
 	# Brasas del fogon: brillan solas (el glow las hace resplandecer).
 	var brasa: StandardMaterial3D = plano.call(Color(0.1, 0.03, 0.01))
 	brasa.emission_enabled = true
@@ -310,5 +375,6 @@ static func todos() -> Dictionary:
 		"pirca": pirca, "silleria": silleria, "poligonal": poligonal, "ichu": ichu,
 		"tierra": tierra, "madera": madera, "ceramica": ceramica, "agua": agua, "roca": roca, "losa": losa,
 		"manta": manta, "maiz": maiz, "hierba": hierba, "algodon": algodon, "lana": lana, "brasa": brasa,
+		"mortaja": mortaja, "barro": barro, "soga": soga,
 	}
 	return _cache
